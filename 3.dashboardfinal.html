@@ -1064,7 +1064,7 @@
 
   <!-- MongoDB Backend Connection -->
   <script>
-    const API_BASE_URL = 'https://empathos-backend.onrender.com/api';
+    const API_BASE_URL = 'https://empathoskrishtina.onrender.com/api';
 
     // Authentication Check - Add this at the VERY BEGINNING of your main app's JavaScript
     function checkAuthentication() {
@@ -2826,7 +2826,7 @@
 
     function initAdminSocket() {
       if (typeof io === 'undefined') return;
-      adminSocket = io('https://empathos-backend.onrender.com');
+      adminSocket = io('https://empathoskrishtina.onrender.com');
       adminSocket.on('connect', () => adminSocket.emit('join-admin'));
       adminSocket.on('new-activity', (data) => {
         if (!data.createdAt) data.createdAt = new Date().toISOString();
@@ -3446,7 +3446,7 @@
       console.log(`Attempting to update user ${userId}`, { displayName, email, role, passwordLength: password.length });
 
       try {
-        const res = await fetch(`https://empathos-backend.onrender.com/api/admin/users/${userId}`, {
+        const res = await fetch(`https://empathoskrishtina.onrender.com/api/admin/users/${userId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ displayName, email, role, password })
