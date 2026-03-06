@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmpathOS Features Grid</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter for professional typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom calming Pink theme */
+        :root {
+            --primary-accent: #7A52A3;
+            /* Secondary Lavender/Mauve */
+            --accent-gold: #FFD76E;
+            /* Soft Gold/Highlight */
+            --dominant-pink: #EC4899;
+            /* Primary Pink/Solution Color */
+            --bg-light: #FAF7FB;
+            --text-dark: #2D1E3A;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+        }
+
+        /* Feature Card Styling */
+        .feature-card {
+            background-color: white;
+            padding: 2.5rem;
+            /* p-10 */
+            border-radius: 1.5rem;
+            /* rounded-xl */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            height: 100%;
+            /* Ensures equal height in the grid */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid #F0E6F7;
+            /* Subtle light border */
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            /* Pink shadow on hover */
+            box-shadow: 0 10px 20px rgba(236, 72, 153, 0.2);
+        }
+
+        /* Icon container styling (Default: Pink) */
+        .feature-icon-container {
+            width: 4.5rem;
+            /* w-18 */
+            height: 4.5rem;
+            /* h-18 */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            /* Default background is now the Dominant Pink */
+            background-color: var(--dominant-pink);
+        }
+
+        .icon-stroke {
+            stroke: white;
+        }
+
+        .icon-fill {
+            fill: var(--accent-gold);
+            /* Gold fill for accents */
+        }
+
+        /* Specific accent overrides for visual variety */
+        .bg-primary-accent {
+            background-color: var(--primary-accent);
+            /* Lavender */
+        }
+
+        .bg-accent-gold {
+            background-color: var(--accent-gold);
+            /* Soft Gold */
+        }
+
+        /* Text color definitions */
+        .text-dark {
+            color: var(--text-dark);
+        }
+
+        /* Text primary is now the dominant Pink */
+        .text-primary {
+            color: var(--dominant-pink);
+        }
+    </style>
+</head>
+
+<body>
+
+    <section class="py-24 px-4 sm:px-6 lg:px-8 bg-light">
+        <div class="container mx-auto max-w-7xl text-center mb-16">
+            <h2 class="text-4xl sm:text-5xl font-extrabold text-dark mb-4">
+                Designed for the Modern, Supported Team
+            </h2>
+            <p class="text-xl text-gray-500 max-w-3xl mx-auto">
+                EmpathOS blends high-performance tools with deep emotional intelligence to foster a truly productive
+                environment.
+            </p>
+        </div>
+
+        <!-- 4-Column Features Grid -->
+        <div class="container mx-auto max-w-7xl">
+            <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+
+                <!-- Feature 1: Unified Workspace (Pink) -->
+                <div class="feature-card">
+                    <div class="feature-icon-container">
+                        <!-- Connection/Mesh Icon -->
+                        <svg class="w-8 h-8 icon-stroke" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v12M18 6v12M6 6v12"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary mb-3">Unified Workspace</h3>
+                    <p class="text-gray-600">Dynamic task management and wellness tools in one platform, eliminating
+                        context switching.</p>
+                </div>
+
+                <!-- Feature 2: Mood-Aware Dashboard (Lavender Accent) -->
+                <div class="feature-card">
+                    <div class="feature-icon-container bg-primary-accent">
+                        <!-- Heart + Analytics Icon -->
+                        <svg class="w-8 h-8 icon-stroke" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8V4M16 12h4M8 12H4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary mb-3">Mood-Aware Dashboard</h3>
+                    <p class="text-gray-600">UI adapts dynamically to the team's collective emotional state, promoting
+                        balance.</p>
+                </div>
+
+                <!-- Feature 3: Burnout Prevention (Gold Accent) -->
+                <div class="feature-card">
+                    <div class="feature-icon-container bg-accent-gold">
+                        <!-- Shield + Wellness Icon -->
+                        <svg class="w-8 h-8 text-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            style="stroke: var(--text-dark);">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m5.618-4.103A9 9 0 1121 12a9 9 0 01-5.382 7.897"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18V6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary mb-3">Burnout Prevention</h3>
+                    <p class="text-gray-600">AI detects stress patterns and proactively suggests timely breaks and
+                        activities.</p>
+                </div>
+
+                <!-- Feature 4: Anonymous Analytics (Pink) -->
+                <div class="feature-card">
+                    <div class="feature-icon-container">
+                        <!-- Privacy + Chart Icon -->
+                        <svg class="w-8 h-8 icon-stroke" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 11c0 1.657-3.582 3-8 3S4 12.657 4 11s3.582-3 8-3 8 1.343 8 3z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary mb-3">Anonymous Analytics</h3>
+                    <p class="text-gray-600">Provides high-level team insights without ever compromising individual
+                        employee privacy.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+</body>
+
+</html>

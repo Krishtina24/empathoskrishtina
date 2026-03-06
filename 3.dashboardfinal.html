@@ -1,0 +1,3549 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EmpathOS — Unified Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --dominant-pink: #db2777;
+      /* Deep Pink */
+      --primary-accent: #881337;
+      /* Rose 900 */
+      --bg-light: #fff1f2;
+      /* Rose 50 */
+      --card-bg: #FFFFFF;
+      --text-dark: #1c1917;
+      /* Stone 900 */
+      --happy-bg: linear-gradient(135deg, #fff1f2, #ffe4e6);
+      --neutral-bg: linear-gradient(135deg, #fafaf9, #f5f5f4);
+      --stressed-bg: linear-gradient(135deg, #fff0f7, #ffe4e6);
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--neutral-bg);
+      color: var(--text-dark);
+      margin: 0
+    }
+
+
+
+    .pop-effect {
+      pointer-events: none;
+      position: fixed;
+      z-index: 200;
+      will-change: transform, opacity
+    }
+
+    .task-board {
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      padding-bottom: 24px;
+      scrollbar-width: thin;
+    }
+
+    .task-column {
+      min-width: 320px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      max-height: 75vh;
+      box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .task-column:hover {
+      box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.08);
+    }
+
+    .task-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+      border: 1px solid rgba(0, 0, 0, 0.02);
+      cursor: grab;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .task-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+      z-index: 10;
+    }
+
+    .task-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 15px;
+      bottom: 15px;
+      width: 4px;
+      background: var(--dominant-pink);
+      border-radius: 0 4px 4px 0;
+      opacity: 0.5;
+    }
+
+    .dragging {
+      opacity: 0.6;
+      transform: scale(0.95) rotate(2deg);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+      cursor: grabbing;
+    }
+
+    .column-header-badge {
+      background: white;
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary-accent);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    .mood-icon {
+      transition: transform .12s;
+      border-radius: 9999px;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer
+    }
+
+    .mood-icon.selected {
+      box-shadow: 0 6px 20px rgba(236, 72, 153, 0.12);
+      border: 2px solid rgba(236, 72, 153, 0.18)
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: all 0.3s ease;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 32px;
+      padding: 0;
+      width: 650px;
+      max-width: 96%;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.3);
+      position: relative;
+      animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes modalPop {
+      from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .modal-lg {
+      width: 950px;
+    }
+
+    .modal-content-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    @media(max-width:900px) {
+      .chat-sidebar {
+        right: 12px;
+        left: auto;
+        top: 70px;
+        bottom: 16px;
+        width: 92vw
+      }
+    }
+
+    /* Wellness page styles */
+    .wellness-page {
+      display: none;
+    }
+
+    .wellness-page.active {
+      display: block;
+    }
+
+    /* Tasks page styles */
+    .tasks-page {
+      display: none;
+    }
+
+    .tasks-page.active {
+      display: block;
+    }
+
+
+
+    /* Dashboard page styles */
+    .dashboard-page {
+      display: block;
+    }
+
+    .dashboard-page.active {
+      display: block;
+    }
+
+
+
+    .focus-preset {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .focus-preset:hover {
+      background-color: #F5F3FF;
+      border-color: #DDD6FE;
+      color: #7C3AED;
+      transform: translateY(-2px);
+    }
+
+    .focus-preset.active {
+      background-color: #7C3AED;
+      border-color: #7C3AED;
+      color: white;
+    }
+
+    /* Custom Scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    /* Admin specific styles */
+    .admin-stat-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .admin-stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .activity-row {
+      animation: slideIn 0.4s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: #10B981;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .pulse-dot::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: inherit;
+      border-radius: inherit;
+      animation: pulse 2s infinite;
+      opacity: 0.6;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.6;
+      }
+
+      100% {
+        transform: scale(3);
+        opacity: 0;
+      }
+    }
+
+    /* Modern Sidebar Styles */
+    .sidebar-modern {
+      background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E1 100%);
+      /* Lavender Blush -> Misty Rose */
+      color: #831843;
+      /* Pink 900 */
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      border-right: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 4px 0 24px -4px rgba(255, 182, 193, 0.3);
+      /* Subtle geometric pattern overlay */
+      background-image:
+        radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.4) 0%, transparent 20%),
+        radial-gradient(circle at 0% 100%, rgba(255, 255, 255, 0.4) 0%, transparent 20%),
+        linear-gradient(180deg, #FFF0F5 0%, #FFE4E1 100%);
+    }
+
+    .nav-item-modern {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      margin: 4px 16px;
+      border-radius: 12px;
+      color: #9d174d;
+      /* Pink 800 */
+      font-weight: 600;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-item-modern:hover {
+      color: #831843;
+      background: rgba(255, 255, 255, 0.5);
+      transform: translateX(2px);
+    }
+
+    .nav-item-modern.active {
+      color: #be185d;
+      /* Pink 700 */
+      background: #FFFFFF;
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.02);
+    }
+
+    .nav-item-modern.active svg,
+    .nav-item-modern.active i {
+      filter: none;
+      /* Removed drop shadow for cleaner look */
+      color: #db2777;
+    }
+
+    .logo-container {
+      padding: 32px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-gradient {
+      background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .sidebar-user-card {
+      margin: 20px;
+      padding: 12px;
+      background: #FFFFFF;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+      transition: all 0.3s ease;
+    }
+
+    .sidebar-user-card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
+
+    /* Responsive Sidebar States */
+    .sidebar-active {
+      transform: translateX(0) !important;
+    }
+
+    #sidebarBackdrop {
+      display: none;
+      opacity: 0;
+    }
+
+    #sidebarBackdrop.active {
+      display: block;
+      opacity: 1;
+    }
+
+    @media (max-width: 1024px) {
+      aside.sidebar-modern {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 60;
+        transform: translateX(-100%);
+        box-shadow: 20px 0 50px rgba(0, 0, 0, 0.2);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- App layout -->
+  <div class="flex h-screen relative overflow-hidden">
+    <!-- Mobile Backdrop -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 transition-opacity"
+      onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="mainSidebar"
+      class="w-72 sidebar-modern text-white flex-shrink-0 flex flex-col shadow-2xl overflow-hidden transition-transform duration-300">
+      <div class="logo-container">
+        <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-stone-100 shadow-sm">
+          <i data-lucide="heart" class="w-6 h-6 text-pink-600"></i>
+        </div>
+        <span class="text-2xl logo-gradient">EmpathOS</span>
+      </div>
+
+      <nav class="flex-1 mt-6">
+        <div class="px-8 mb-3 text-[10px] uppercase tracking-[0.2em] font-bold text-pink-900/50">Main Menu</div>
+
+        <a href="#" id="nav-admin" class="nav-item-modern hidden" data-page="admin">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+          <span>Admin Console</span>
+        </a>
+
+        <a href="#" id="nav-dashboard" class="nav-item-modern active" data-page="dashboard">
+          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="#" id="nav-tasks" class="nav-item-modern" data-page="tasks">
+          <i data-lucide="check-square" class="w-5 h-5"></i>
+          <span>My Tasks</span>
+        </a>
+
+        <a href="#" id="nav-wellness" class="nav-item-modern" data-page="wellness">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+          <span>Wellness</span>
+        </a>
+
+
+
+        <a href="#" id="nav-profile" class="nav-item-modern" data-page="profile">
+          <i data-lucide="user" class="w-5 h-5"></i>
+          <span>Profile</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-user-card">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-indigo-600 flex items-center justify-center font-bold border-2 border-white/10"
+            id="sidebarAvatar">
+            U
+          </div>
+          <div class="overflow-hidden">
+            <p class="text-sm font-bold truncate text-stone-900" id="profileName">User</p>
+            <p class="text-[10px] text-stone-500 font-bold uppercase tracking-wider" id="authStatusText">Online Now
+            </p>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center justify-between">
+          <div id="authStatus"
+            class="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+            Connected</div>
+          <button id="sidebarLogoutBtn" class="text-stone-400 hover:text-red-400 transition" title="Logout">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col overflow-hidden w-full">
+      <header class="bg-white shadow-md p-4 md:p-6">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-4">
+            <button onclick="toggleSidebar()"
+              class="lg:hidden p-2 text-stone-500 hover:bg-stone-100 rounded-xl transition-colors">
+              <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+            <h1 class="text-xl md:text-3xl font-bold text-gray-900 truncate" id="page-title">My Dashboard</h1>
+          </div>
+          <div class="relative flex items-center space-x-2 md:space-x-4 cursor-pointer" id="userProfileTrigger">
+            <span class="text-gray-600 font-medium hidden md:block" id="welcome-message">Welcome, User!</span>
+            <div id="userAvatar"
+              class="h-10 w-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-lg shadow-md ring-2 ring-white select-none transition transform hover:scale-105">
+              U</div>
+
+            <!-- Dropdown Menu -->
+            <div id="profileDropdown"
+              class="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 hidden z-50 transform origin-top-right transition-all duration-200">
+              <div class="p-4 border-b border-gray-100">
+                <p class="text-sm font-bold text-gray-900 truncate" id="dropdown-name">User</p>
+                <p class="text-[10px] font-medium text-pink-500 truncate mb-1" id="dropdown-job">No Title Set</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-xs text-gray-500 truncate" id="dropdown-id">ID: --</p>
+                  <span class="text-gray-300">|</span>
+                  <p class="text-xs text-gray-500 truncate" id="dropdown-email">user@example.com</p>
+                </div>
+              </div>
+              <div class="p-2">
+                <a href="#" onclick="showPage('profile')"
+                  class="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-pink-50 rounded-lg transition-colors">
+                  <span class="mr-2">👤</span> My Profile
+                </a>
+                <button id="headerLogoutBtn"
+                  class="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left w-full">
+                  <span class="mr-2">🚪</span> Switch User / Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Admin Page -->
+      <main class="admin-page flex-1 overflow-auto bg-slate-50 p-8 hidden">
+        <div class="flex justify-between items-center mb-8">
+          <div>
+            <h2 class="text-3xl font-black text-slate-800">Org Insights</h2>
+            <p class="text-slate-500 font-medium">Monitoring activity across <span id="admin-userCountText"
+                class="text-indigo-600 font-bold">...</span> employees</p>
+          </div>
+          <div
+            class="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-100">
+            <span class="pulse-dot"></span>
+            LIVE SYNC ACTIVE
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div class="admin-stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Total Registered</p>
+            <h3 id="admin-stat-total-users" class="text-3xl font-black text-indigo-600">...</h3>
+          </div>
+          <div class="admin-stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Total Employees</p>
+            <h3 id="admin-stat-total-employees" class="text-3xl font-black text-slate-800">...</h3>
+          </div>
+          <div class="admin-stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Team Vibe</p>
+            <h3 id="admin-stat-avg-mood" class="text-3xl font-black text-pink-500">Neutral</h3>
+          </div>
+          <div class="admin-stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Tasks Today</p>
+            <h3 id="admin-stat-total-tasks" class="text-3xl font-black text-cyan-600">...</h3>
+          </div>
+        </div>
+
+        <!-- Employee Directory -->
+        <div
+          class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-4 md:p-8 mb-8">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-3">
+              <span
+                class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm">👥</span>
+              Employee Directory
+            </h3>
+            <div class="relative w-full sm:w-auto">
+              <input type="text" id="admin-user-search" onkeyup="filterEmployees()" placeholder="Search staff..."
+                class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-64 transition-all">
+              <span class="absolute left-3 top-2.5 text-slate-400">🔍</span>
+            </div>
+          </div>
+          <div id="admin-employee-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="col-span-full py-12 text-center text-slate-400 italic">Loading staff directory...</div>
+          </div>
+        </div>
+
+        <!-- Productivity Analysis Section -->
+        <div
+          class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-6 md:p-10 mb-8 transition-all hover:shadow-2xl hover:shadow-slate-200/80">
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+            <div>
+              <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                <span
+                  class="w-10 h-10 bg-cyan-100 text-cyan-600 rounded-xl flex items-center justify-center text-xl">📈</span>
+                Performance Analytics
+              </h3>
+              <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2 ml-1">Task execution
+                velocity across the organization</p>
+            </div>
+            <div class="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Focus Scope:</span>
+              <select id="performanceEmployeeSelect" onchange="updatePerformanceChart()"
+                class="bg-white border-2 border-slate-100 rounded-xl px-6 py-2.5 text-sm font-bold text-slate-700 focus:border-indigo-500 focus:ring-0 outline-none transition-all cursor-pointer min-w-[240px]">
+                <option value="all">Global Aggregate (All Staff)</option>
+              </select>
+            </div>
+          </div>
+          <div class="h-[400px] w-full relative">
+            <canvas id="adminPerformanceChart"></canvas>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="lg:col-span-2">
+            <div
+              class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col overflow-hidden transition-all">
+              <div
+                class="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                <h3 class="text-xl font-bold text-slate-800">Global Activity Feed</h3>
+                <button onclick="clearAdminFeed()"
+                  class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">Clear</button>
+              </div>
+              <div id="admin-activity-feed"
+                class="flex-1 min-h-[300px] md:min-h-[500px] max-h-[600px] overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+                <div class="flex items-center justify-center h-full text-slate-400 italic">Connecting to live stream...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-8">
+            <div
+              class="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
+              <h3 class="text-xl font-bold text-slate-800 mb-6">Mood Distribution</h3>
+              <div class="h-64 mb-6"><canvas id="adminMoodChartUnified"></canvas></div>
+              <div id="admin-mood-labels" class="space-y-3"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Dashboard Page -->
+      <main class="dashboard-page flex-1 overflow-auto bg-stone-50 p-6">
+        <div class="mb-6 bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-500 mb-2">My User ID:</h3>
+          <p id="user-id" class="text-lg text-gray-900 font-mono break-all">—</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+            <h3 class="text-sm md:text-lg font-semibold text-gray-400 mb-2 uppercase tracking-tight">Today's Mood</h3>
+            <p id="current-mood" class="text-3xl md:text-4xl font-black text-green-500">—</p>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+            <h3 class="text-sm md:text-lg font-semibold text-gray-400 mb-2 uppercase tracking-tight">Tasks Finished</h3>
+            <p id="tasks-completed" class="text-3xl md:text-4xl font-black text-gray-900">0</p>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-stone-100 sm:col-span-2 lg:col-span-1">
+            <h3 class="text-sm md:text-lg font-semibold text-stone-400 mb-2 uppercase tracking-tight">Current Focus</h3>
+            <p id="current-project" class="text-lg md:text-2xl font-bold text-pink-600 break-words">—</p>
+          </div>
+        </div>
+
+        <!-- Mood chart and focus -->
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-lg lg:col-span-2">
+            <h3 class="text-xl font-bold mb-4">My Emotional Pulse (Last 7 Days)</h3>
+            <div style="height:260px"><canvas id="moodChart"></canvas></div>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 flex flex-col justify-between h-full">
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Deep Focus</h3>
+              </div>
+              <p class="text-gray-500 text-sm mb-6 leading-relaxed">Boost your productivity with timed focus blocks.</p>
+
+              <div class="space-y-4 mb-8">
+                <div>
+                  <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Quick
+                    Session</label>
+                  <div class="flex gap-2">
+                    <button onclick="setFocusTime(25, this)"
+                      class="focus-preset flex-1 py-2 px-3 rounded-xl border border-gray-100 text-sm font-semibold text-gray-600 transition active">25m</button>
+                    <button onclick="setFocusTime(50, this)"
+                      class="focus-preset flex-1 py-2 px-3 rounded-xl border border-gray-100 text-sm font-semibold text-gray-600 transition">50m</button>
+                    <button onclick="setFocusTime(90, this)"
+                      class="focus-preset flex-1 py-2 px-3 rounded-xl border border-gray-100 text-sm font-semibold text-gray-600 transition">90m</button>
+                  </div>
+                </div>
+
+                <div class="flex gap-4">
+                  <div class="flex-1">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Focus
+                      (min)</label>
+                    <input id="focusDuration" type="number" value="25"
+                      class="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-400 outline-none">
+                  </div>
+                  <div class="flex-1">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Break
+                      (min)</label>
+                    <input id="focusBreak" type="number" value="5"
+                      class="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-400 outline-none">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button id="startFocusBtn"
+              class="w-full bg-gradient-to-r from-pink-600 to-rose-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:scale-[1.02] active:scale-95 transition-all"
+              onclick="openFocusModal()">
+              Start Focus Session
+            </button>
+          </div>
+        </div>
+
+        <!-- Mood Logging -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Log Your Mood</h3>
+            <div class="flex space-x-2 sm:space-x-4">
+              <button
+                class="mood-btn flex-1 flex flex-col items-center p-3 rounded-2xl hover:bg-pink-50 transition-all duration-300 border-2 border-transparent hover:border-pink-100 group"
+                data-mood="happy">
+                <span class="text-3xl md:text-4xl group-hover:scale-110 transition-transform duration-300">😊</span>
+                <span
+                  class="text-[10px] md:text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider group-hover:text-pink-600">Happy</span>
+              </button>
+              <button
+                class="mood-btn flex-1 flex flex-col items-center p-3 rounded-2xl hover:bg-slate-50 transition-all duration-300 border-2 border-transparent hover:border-slate-100 group"
+                data-mood="neutral">
+                <span class="text-3xl md:text-4xl group-hover:scale-110 transition-transform duration-300">😐</span>
+                <span
+                  class="text-[10px] md:text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider group-hover:text-slate-600">Neutral</span>
+              </button>
+              <button
+                class="mood-btn flex-1 flex flex-col items-center p-3 rounded-2xl hover:bg-purple-50 transition-all duration-300 border-2 border-transparent hover:border-purple-100 group"
+                data-mood="stressed">
+                <span class="text-3xl md:text-4xl group-hover:scale-110 transition-transform duration-300">😩</span>
+                <span
+                  class="text-[10px] md:text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider group-hover:text-purple-600">Stressed</span>
+              </button>
+              <button
+                class="mood-btn flex-1 flex flex-col items-center p-3 rounded-2xl hover:bg-red-50 transition-all duration-300 border-2 border-transparent hover:border-red-100 group"
+                data-mood="angry">
+                <span class="text-3xl md:text-4xl group-hover:scale-110 transition-transform duration-300">😠</span>
+                <span
+                  class="text-[10px] md:text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider group-hover:text-red-600">Angry</span>
+              </button>
+              <button
+                class="mood-btn flex-1 flex flex-col items-center p-3 rounded-2xl hover:bg-amber-50 transition-all duration-300 border-2 border-transparent hover:border-amber-100 group"
+                data-mood="relieved">
+                <span class="text-3xl md:text-4xl group-hover:scale-110 transition-transform duration-300">😅</span>
+                <span
+                  class="text-[10px] md:text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider group-hover:text-amber-600">Relieved</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Quick Task</h3>
+            <div class="flex space-x-2">
+              <input type="text" id="task-input"
+                class="flex-1 p-3 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 bg-stone-50"
+                placeholder="e.g., Complete report">
+              <button id="add-task-btn"
+                class="px-6 py-3 rounded-xl text-white bg-pink-600 hover:bg-pink-700 transition duration-300 font-bold shadow-md shadow-pink-200">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Activity History</h3>
+          <div class="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mood</th>
+                </tr>
+              </thead>
+              <tbody id="activity-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </div>
+
+
+      </main>
+
+      <!-- Tasks Page -->
+      <main class="tasks-page flex-1 overflow-auto bg-gray-100 p-6">
+        <div class="mb-8">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2
+                class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-2">
+                My Task Board</h2>
+              <p class="text-gray-500 font-medium">Design your workflow and track progress.</p>
+            </div>
+
+            <div class="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+              <input id="newColumnName" placeholder="New Section..."
+                class="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-pink-400 outline-none" />
+              <button class="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 transition"
+                id="addSectionBtn">Add Space</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task board & controls -->
+        <div class="mt-6">
+          <div id="taskBoardWrap" class="task-board" style="min-height:400px"></div>
+        </div>
+
+        <!-- Add Task -->
+        <div class="mt-8 bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Add a Task</h3>
+          <div class="flex space-x-2">
+            <input type="text" id="task-input-tasks"
+              class="flex-1 p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Complete report">
+            <button id="add-task-btn-tasks"
+              class="px-6 py-3 rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition duration-300">Add</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Wellness Page -->
+      <main class="wellness-page flex-1 overflow-auto bg-gray-100 p-6">
+        <div class="mb-6 bg-white p-6 rounded-3xl shadow-lg border border-gray-200">
+          <h2 class="text-2xl font-bold text-gray-900 mb-4">Wellness Center</h2>
+          <p class="text-gray-600">Take care of your mental and physical well-being with these tools.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Meditation Card -->
+          <div
+            class="group bg-white p-8 rounded-3xl shadow-lg border border-gray-100 transition-all hover:shadow-2xl hover:-translate-y-1">
+            <div
+              class="w-14 h-14 bg-pink-100 rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
+              🧘</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3">Meditation</h3>
+            <p class="text-gray-500 mb-8 leading-relaxed">Take a moment to center yourself and clear your mind with
+              guided mindfulness.</p>
+            <button
+              class="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-pink-600 transition-colors shadow-lg active:scale-95"
+              onclick="startMeditation(5)">Start 5-Min Session</button>
+          </div>
+
+          <!-- Breathing Card -->
+          <div
+            class="group bg-white p-8 rounded-3xl shadow-lg border border-gray-100 transition-all hover:shadow-2xl hover:-translate-y-1">
+            <div
+              class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
+              💨</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3">Breathing</h3>
+            <h4 class="text-sm font-bold text-blue-500 uppercase tracking-widest mb-2">4-7-8 Technique</h4>
+            <p class="text-gray-500 mb-8 leading-relaxed">A powerful rhythmic breathing pattern for instant relaxation
+              and stress relief.</p>
+            <button
+              class="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-blue-600 transition-colors shadow-lg active:scale-95"
+              onclick="openBreathing()">Start Exercise</button>
+          </div>
+
+          <!-- Eye Exercise Card -->
+          <div
+            class="group bg-white p-8 rounded-3xl shadow-lg border border-gray-100 transition-all hover:shadow-2xl hover:-translate-y-1">
+            <div
+              class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
+              👁️</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3">Eye Relief</h3>
+            <h4 class="text-sm font-bold text-green-500 uppercase tracking-widest mb-2">20-20-20 Rule</h4>
+            <p class="text-gray-500 mb-8 leading-relaxed">Prevent digital eye strain by looking at distant objects every
+              20 minutes.</p>
+            <button
+              class="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-green-600 transition-colors shadow-lg active:scale-95"
+              onclick="openEyeExercise()">Start Eye Refresh</button>
+          </div>
+        </div>
+
+      </main>
+
+
+
+      <!-- Profile Page -->
+      <main class="profile-page flex-1 overflow-auto bg-gray-100 p-6" style="display:none">
+        <div class="max-w-4xl mx-auto">
+          <div class="mb-8">
+            <h2
+              class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-2">
+              Profile Settings</h2>
+            <p class="text-gray-500 font-medium">Manage your personal information and preferences.</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Sidebar Info -->
+            <div class="lg:col-span-1 space-y-6">
+              <div class="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-center">
+                <div class="relative inline-block mb-4">
+                  <div id="profileAvatarLarge"
+                    class="w-32 h-32 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center text-5xl font-bold shadow-2xl ring-4 ring-white">
+                    U
+                  </div>
+                </div>
+                <h3 id="profileDisplayNameDisplay" class="text-xl font-bold text-gray-900 mb-1">User Name</h3>
+                <p id="profileJobDisplay" class="text-gray-500 text-sm mb-4">Role / Title</p>
+                <div class="flex justify-center gap-2">
+                  <span id="profileRoleBadge"
+                    class="px-3 py-1 bg-pink-50 text-pink-600 text-xs font-bold rounded-full border border-pink-100">Employee</span>
+                </div>
+              </div>
+
+              <div class="bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
+                <h4 class="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wider">Account Stats</h4>
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-500 text-sm">Tasks Done</span>
+                    <span id="statTasks" class="font-bold text-gray-900">0</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-500 text-sm">Current Mood</span>
+                    <span id="statMood" class="font-bold text-green-500">—</span>
+                  </div>
+                  <hr class="border-gray-50">
+                  <button id="logoutBtn"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition">
+                    <span>🚪</span> Logout Account
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main Form -->
+            <div class="lg:col-span-2 space-y-8">
+              <div class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                <h3 class="text-xl font-bold text-gray-900 mb-6">Personal Details</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Full
+                      Display Name</label>
+                    <input type="text" id="profile-name"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition"
+                      placeholder="Your full name" />
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Email
+                      Address</label>
+                    <input type="email" id="profile-email"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition"
+                      placeholder="email@example.com" />
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Contact
+                      Number</label>
+                    <input type="text" id="profile-contact"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition"
+                      placeholder="+1 (555) 000-0000" />
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Job Title /
+                      Role</label>
+                    <input type="text" id="profile-job"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition"
+                      placeholder="UX Designer / Product Lead" />
+                  </div>
+
+                  <div>
+                    <label
+                      class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Location</label>
+                    <input type="text" id="profile-location"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition"
+                      placeholder="New York, USA" />
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Bio / About
+                      Me</label>
+                    <textarea id="profile-bio" rows="4"
+                      class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-gray-900 focus:ring-2 focus:ring-pink-400 outline-none transition resize-none"
+                      placeholder="Tell us a bit about yourself..."></textarea>
+                  </div>
+                </div>
+
+                <div class="mt-8 flex justify-end">
+                  <button id="saveProfileBtn"
+                    class="px-10 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-pink-100 flex items-center gap-2">
+                    <span id="saveBtnText">Save Changes</span>
+                    <span id="saveBtnSpinner" class="hidden animate-spin">⌛</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+          <div class="rounded-full bg-white p-2 text-pink-500"><svg class="w-6 h-6" viewBox="0 0 24 24"
+              fill="currentColor">
+              <path
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg></div>
+          <div>
+            <div id="wellTitle" class="font-bold">Wellness Check</div>
+            <div id="wellSubtitle" class="text-sm opacity-90">You seem neutral.</div>
+          </div>
+        </div>
+
+        <div class="text-sm">
+          <span id="current-page-indicator">Dashboard</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Modal/backdrop -->
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" id="modalContent" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <!-- Pop container -->
+  <div id="popContainer"></div>
+
+
+  <!-- MongoDB Backend Connection -->
+  <script>
+    const API_BASE_URL = 'http://localhost:5000/api';
+
+    // Authentication Check - Add this at the VERY BEGINNING of your main app's JavaScript
+    function checkAuthentication() {
+      const user = localStorage.getItem('empathos_user');
+      const token = localStorage.getItem('empathos_token');
+
+      if (!user || !token) {
+        // Redirect to login page if not authenticated
+        window.location.href = '2.login.html';
+        return false;
+      }
+
+      return JSON.parse(user);
+    }
+
+    async function refreshUserProfile(userId) {
+      try {
+        const token = localStorage.getItem('empathos_token');
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/dashboard`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (data.success) {
+          // Update local storage and UI
+          const freshUser = { ...JSON.parse(localStorage.getItem('empathos_user')), ...data.user };
+          localStorage.setItem('empathos_user', JSON.stringify(freshUser));
+          currentUser = freshUser;
+          updateUIWithUser(currentUser);
+          if (data.activities) {
+            renderActivityRows(data.activities);
+          }
+          if (data.moodHistory) {
+            localStore.moodLog = data.moodHistory.map(m => ({
+              mood: m.mood,
+              ts: new Date(m.createdAt).getTime()
+            }));
+            saveLocal();
+            updateMoodChartFromLog();
+          }
+          return freshUser;
+        }
+      } catch (e) {
+        console.error('Failed to refresh user profile:', e);
+      }
+      return null;
+    }
+
+    // Call this function when your main app loads
+    document.addEventListener('DOMContentLoaded', async function () {
+      const user = checkAuthentication();
+
+      if (user) {
+        // User is authenticated, proceed with app initialization
+        console.log('Welcome back, ' + user.displayName);
+
+        // Update global user object
+        currentUser = user;
+        updateUIWithUser(currentUser);
+
+        // Fetch fresh data from server to ensure ID is correct
+        await refreshUserProfile(user.id);
+
+        // Start the app now that we have a user
+        initApp();
+      }
+
+      // Profile event listeners
+      const saveBtn = document.getElementById('saveProfileBtn');
+      if (saveBtn) saveBtn.addEventListener('click', updateProfile);
+
+      const logoutBtnProfile = document.getElementById('logoutBtn');
+      if (logoutBtnProfile) logoutBtnProfile.addEventListener('click', performLogout);
+    });
+
+
+    // Local store (fallback when backend is offline)
+    const localStore = {
+      columns: JSON.parse(localStorage.getItem('em_columns') || 'null') || [
+        { id: 'col-todo', name: 'To Do', tasks: [] },
+        { id: 'col-inprogress', name: 'In Progress', tasks: [] },
+        { id: 'col-done', name: 'Done', tasks: [] }
+      ],
+
+      moodLog: JSON.parse(localStorage.getItem('em_moodLog') || '[]'),
+      mood: localStorage.getItem('em_mood') || 'neutral',
+      user: (function () {
+        try {
+          const u = localStorage.getItem('empathos_user');
+          if (u) return JSON.parse(u).displayName || 'You';
+        } catch (e) { }
+        return localStorage.getItem('em_user') || 'You';
+      })()
+    };
+
+    // DOM refs
+    const profileNameEl = document.getElementById('profileName');
+    const authStatusEl = document.getElementById('authStatus');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const userIdEl = document.getElementById('user-id');
+
+    let currentUser = null;
+
+    // Initialize UI defaults from local
+    profileNameEl.textContent = localStore.user;
+    welcomeMessage.textContent = `Welcome, ${localStore.user}!`;
+    userIdEl.textContent = '—';
+    authStatusEl.textContent = 'Auth: connecting...';
+
+    /* ----------------- MongoDB API Functions ----------------- */
+    async function apiCall(endpoint, options = {}) {
+      try {
+        const token = localStorage.getItem('empathos_token');
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+            ...options.headers
+          },
+          ...options
+        });
+
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(text || `HTTP error! status: ${response.status}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || data.message || `HTTP error! status: ${response.status}`);
+        }
+
+        return data;
+      } catch (error) {
+        console.error('API call failed:', error);
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+          throw new Error('Cannot connect to backend. Please ensure the server is running on port 5000.');
+        }
+        throw error;
+      }
+    }
+
+    async function updateProfile() {
+      if (!currentUser) return;
+
+      const saveBtn = document.getElementById('saveProfileBtn');
+      const btnText = document.getElementById('saveBtnText');
+      const btnSpinner = document.getElementById('saveBtnSpinner');
+
+      const profileData = {
+        displayName: document.getElementById('profile-name').value,
+        email: document.getElementById('profile-email').value,
+        contact: document.getElementById('profile-contact').value,
+        jobTitle: document.getElementById('profile-job').value,
+        location: document.getElementById('profile-location').value,
+        bio: document.getElementById('profile-bio').value
+      };
+
+      try {
+        if (!currentUser || (!currentUser.id && !currentUser._id)) {
+          console.error('Update profile failed: No user ID found', currentUser);
+          toast('Error: User session is invalid. Please log in again.');
+          return;
+        }
+
+        const userId = currentUser.id || currentUser._id;
+
+        if (saveBtn) saveBtn.disabled = true;
+        if (btnText) btnText.textContent = 'Saving...';
+        if (btnSpinner) btnSpinner.classList.remove('hidden');
+
+        console.log('Update Data:', profileData);
+
+        const response = await apiCall(`/users/${userId}/profile`, {
+          method: 'PUT',
+          body: JSON.stringify(profileData)
+        });
+
+        console.log('Update Response:', response);
+
+        if (response.success) {
+          currentUser = { ...currentUser, ...response.user };
+          localStorage.setItem('empathos_user', JSON.stringify(currentUser));
+          updateUIWithUser(currentUser);
+          await refreshUserProfile(userId); // Sync activity history and stats
+          toast('Profile updated successfully! ✨');
+        } else {
+          throw new Error(response.error || 'Server returned success:false');
+        }
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        toast(`Failed to save profile: ${error.message}`);
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+        if (btnText) btnText.textContent = 'Save Changes';
+        if (btnSpinner) btnSpinner.classList.add('hidden');
+      }
+    }
+
+    // User management - Simplified to only handle session refresh
+    async function loginUser() {
+      const storedUser = localStorage.getItem('empathos_user');
+      if (!storedUser) return null;
+
+      try {
+        currentUser = JSON.parse(storedUser);
+        updateUIWithUser(currentUser);
+        authStatusEl.textContent = 'Auth: connected (Session)';
+
+        // Try to refresh from server
+        await refreshUserProfile(currentUser.id);
+        return currentUser;
+      } catch (error) {
+        console.warn('Session init failed:', error);
+        authStatusEl.textContent = 'Auth: session error';
+        return null;
+      }
+    }
+
+    function updateUIWithUser(user) {
+      if (profileNameEl) profileNameEl.textContent = user.displayName;
+      if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${user.displayName}!`;
+      if (userIdEl) userIdEl.textContent = user.customId || user.id;
+
+      // Update Avatar & Dropdown
+      const initial = user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U';
+      const avatarElements = [document.getElementById('userAvatar'), document.getElementById('profileAvatarLarge')];
+      avatarElements.forEach(el => {
+        if (el) el.textContent = initial;
+      });
+
+      const ddName = document.getElementById('dropdown-name');
+      const ddId = document.getElementById('dropdown-id');
+      const ddEmail = document.getElementById('dropdown-email');
+      const ddJob = document.getElementById('dropdown-job');
+
+      if (ddName) ddName.textContent = user.displayName;
+      if (ddId) ddId.textContent = `ID: ${user.customId || user.id}`;
+      if (ddEmail) ddEmail.textContent = user.email || 'No email set';
+      if (ddJob) ddJob.textContent = user.jobTitle || 'No Title Set';
+
+      // Update Browser Title
+      document.title = `${user.displayName} | EmpathOS Dashboard`;
+
+      // Update Profile Page Fields
+      const profileFields = {
+        'profile-name': user.displayName,
+        'profile-email': user.email || '',
+        'profile-contact': user.contact || '',
+        'profile-job': user.jobTitle || '',
+        'profile-location': user.location || '',
+        'profile-bio': user.bio || '',
+        'profileDisplayNameDisplay': user.displayName,
+        'profileJobDisplay': user.jobTitle || 'No Title Set',
+        'profileRoleBadge': user.role || 'Employee',
+        'statTasks': user.tasksCompleted || 0,
+        'statMood': user.currentMood ? (user.currentMood.charAt(0).toUpperCase() + user.currentMood.slice(1)) : 'Not Set'
+      };
+
+      for (const [id, value] of Object.entries(profileFields)) {
+        const el = document.getElementById(id);
+        if (el) {
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.value = value;
+          } else {
+            el.textContent = value;
+            // Specific styling for Role Badge
+            if (id === 'profileRoleBadge') {
+              const isAdmin = value.toLowerCase() === 'admin';
+              el.className = `px-3 py-1 text-xs font-bold rounded-full border ${isAdmin
+                ? 'bg-purple-50 text-purple-600 border-purple-100'
+                : 'bg-pink-50 text-pink-600 border-pink-100'
+                }`;
+            }
+          }
+        }
+      }
+
+      // Update sidebar specific elements
+      const sidebarAvatar = document.getElementById('sidebarAvatar');
+      if (sidebarAvatar) {
+        sidebarAvatar.textContent = initial;
+      }
+
+      const adminNavItem = document.getElementById('nav-admin');
+      if (adminNavItem) {
+        if (user.role && user.role.toLowerCase() === 'admin') {
+          adminNavItem.classList.remove('hidden');
+        } else {
+          adminNavItem.classList.add('hidden');
+        }
+      }
+
+      const moodEl = document.getElementById('current-mood');
+      if (moodEl) {
+        if (!user.currentMood) {
+          moodEl.textContent = 'Not Set';
+          moodEl.className = 'text-4xl font-bold text-gray-300';
+        } else {
+          moodEl.textContent = user.currentMood.charAt(0).toUpperCase() + user.currentMood.slice(1);
+          const colors = { happy: 'text-emerald-500', neutral: 'text-slate-500', stressed: 'text-pink-500', angry: 'text-red-500', relieved: 'text-amber-500' };
+          moodEl.className = `text-4xl font-bold ${colors[user.currentMood] || 'text-gray-500'}`;
+        }
+      }
+      const tasksEl = document.getElementById('tasks-completed');
+      if (tasksEl) tasksEl.textContent = user.tasksCompleted || 0;
+      const projectEl = document.getElementById('current-project');
+      if (projectEl) projectEl.textContent = user.currentProject || '—';
+    }
+
+    // Tasks API
+    async function loadTasks() {
+      if (!currentUser) {
+        renderBoard(); // Render whatever we have in localStore
+        return;
+      }
+
+      try {
+        const response = await apiCall(`/tasks/${currentUser.id}`);
+        if (response.success && response.columns) {
+          const normalize = (tasks) => tasks.map(t => ({ ...t, id: t._id || t.id }));
+
+          localStore.columns = [
+            { id: 'col-todo', name: 'To Do', tasks: normalize(response.columns.todo || []) },
+            { id: 'col-inprogress', name: 'In Progress', tasks: normalize(response.columns.inprogress || []) },
+            { id: 'col-done', name: 'Done', tasks: normalize(response.columns.done || []) }
+          ];
+          saveLocal();
+        }
+      } catch (error) {
+        console.warn('Failed to load tasks, using local storage');
+      }
+
+      // Always render board at the end
+      renderBoard();
+    }
+
+    async function saveTask(taskData) {
+      if (!currentUser) {
+        // Local storage fallback
+        const col = localStore.columns[0];
+        const task = {
+          id: 't' + Date.now(),
+          ...taskData
+        };
+        col.tasks.push(task);
+        saveLocal();
+        renderBoard();
+        return task;
+      }
+
+      try {
+        const response = await apiCall(`/tasks/${currentUser.id}`, {
+          method: 'POST',
+          body: JSON.stringify(taskData)
+        });
+
+        if (response.success) {
+          await loadTasks(); // Reload tasks
+          await refreshUserProfile(currentUser.id); // Refresh activity log
+          return response.task;
+        }
+      } catch (error) {
+        console.warn('Failed to save task, using local storage');
+        // Fallback to local storage
+        const col = localStore.columns[0];
+        const task = {
+          id: 't' + Date.now(),
+          ...taskData
+        };
+        col.tasks.push(task);
+        saveLocal();
+        renderBoard();
+        return task;
+      }
+    }
+
+    // Mood API
+    async function logMood(mood) {
+      applyTheme(mood);
+
+      const entry = { mood, ts: Date.now() };
+      localStore.moodLog.push(entry);
+      localStore.mood = mood;
+      saveLocal();
+      updateMoodChartFromLog();
+
+      toast('Mood logged: ' + mood);
+      playSound('notify');
+
+      // Update UI immediately
+      const moodEl = document.getElementById('current-mood');
+      if (moodEl) moodEl.textContent = mood;
+
+      // Update local object
+      if (currentUser) {
+        currentUser.currentMood = mood;
+        // Also update sidebar wellness check if exists
+        const wellSubtitle = document.getElementById('wellSubtitle');
+        if (wellSubtitle) wellSubtitle.textContent = `You seem ${mood}.`;
+      }
+
+      refreshUserProfile(currentUser.id); // Refresh activity log
+      renderActivityRows(); // Local fallback update
+
+      if (currentUser && currentUser.id !== 'local-user') {
+        try {
+          await apiCall(`/users/${currentUser.id}/mood`, {
+            method: 'POST',
+            body: JSON.stringify({ mood })
+          });
+          refreshUserProfile(currentUser.id);
+        } catch (error) {
+          console.warn('Failed to sync mood to server');
+        }
+      }
+    }
+
+    // Generic Activity Logger for Admin visibility
+    async function logActivity(activity, type = 'system', mood = null) {
+      if (currentUser && currentUser.id !== 'local-user') {
+        try {
+          await apiCall(`/users/${currentUser.id}/activity`, {
+            method: 'POST',
+            body: JSON.stringify({ activity, type, mood })
+          });
+        } catch (error) {
+          console.warn('Failed to sync activity to server');
+        }
+      }
+    }
+
+
+
+    /* ----------------- Page Navigation ----------------- */
+    function showPage(pageName) {
+      // Hide all pages
+      document.querySelectorAll('main').forEach(page => {
+        page.style.display = 'none';
+      });
+
+      // Show selected page
+      document.querySelector(`.${pageName}-page`).style.display = 'block';
+
+      // Update page title
+      const titles = {
+        'admin': 'Admin Console',
+        'dashboard': 'My Dashboard',
+        'tasks': 'My Tasks',
+        'wellness': 'Wellness Center',
+        'profile': 'Profile Settings'
+      };
+      document.getElementById('page-title').textContent = titles[pageName] || 'EmpathOS';
+      document.getElementById('current-page-indicator').textContent = titles[pageName] || 'Dashboard';
+
+      // Update nav items
+      document.querySelectorAll('.nav-item-modern').forEach(item => {
+        if (item.dataset.page === pageName) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+
+      // Render specific content if needed
+
+    }
+
+    // Add event listeners for navigation
+    document.querySelectorAll('.nav-item-modern').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage(item.dataset.page);
+      });
+    });
+
+    // Initialize Lucide icons
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    /* ----------------- Utility UI functions ----------------- */
+    function toast(msg, ms = 2800) {
+      const el = document.createElement('div');
+      el.textContent = msg;
+      Object.assign(el.style, { position: 'fixed', right: '20px', bottom: '20px', background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '10px 14px', borderRadius: '8px', zIndex: 9999 });
+      document.body.appendChild(el); setTimeout(() => el.remove(), ms);
+      playSound('notify');
+    }
+
+    function playSound(kind) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        const g = ctx.createGain(); g.gain.value = 0.02; g.connect(ctx.destination);
+        if (kind === 'chime') {
+          const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880; o.connect(g); o.start(now); o.stop(now + 0.6);
+        } else if (kind === 'notify') {
+          const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator();
+          o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = 880; o2.frequency.value = 1320;
+          const m = ctx.createGain(); m.gain.value = 0.02; o1.connect(m); o2.connect(m); m.connect(ctx.destination);
+          o1.start(now); o2.start(now); o1.stop(now + 0.12); o2.stop(now + 0.12);
+        }
+      } catch (e) { }
+    }
+
+    /* ----------------- Pop effects ----------------- */
+    function spawnPop(symbol, count = 8) {
+      const container = document.getElementById('popContainer');
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'pop-effect';
+        el.style.left = (50 + (Math.random() * 20 - 10)) + '%';
+        el.style.top = (40 + Math.random() * 30) + '%';
+        el.style.fontSize = (12 + Math.random() * 18) + 'px';
+        el.style.opacity = 1;
+        el.textContent = symbol;
+        container.appendChild(el);
+        const dx = (Math.random() * 120 - 60);
+        const dy = - (60 + Math.random() * 160);
+        el.animate([
+          { transform: `translate(0,0) scale(1)`, opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(1.6)`, opacity: 0 }
+        ], { duration: 1200 + Math.random() * 800, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        setTimeout(() => el.remove(), 2000 + Math.random() * 1200);
+      }
+    }
+
+    /* ----------------- Theme & mood effects ----------------- */
+    function applyTheme(m) {
+      if (m === 'happy') { document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--happy-bg') || 'linear-gradient(135deg,#FFEEF6,#FFF8F2)'; document.getElementById('wellSubtitle').textContent = 'You seem happy — great energy!'; spawnPop('❤️', 12); }
+      else if (m === 'neutral') { document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--neutral-bg') || 'linear-gradient(135deg,#F3F1FB,#F7F5FB)'; document.getElementById('wellSubtitle').textContent = 'You seem neutral.'; }
+      else { document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--stressed-bg') || 'linear-gradient(135deg,#FCEAF0,#FFF0F6)'; document.getElementById('wellSubtitle').textContent = 'You seem stressed — try a short break.'; spawnPop('💨', 8); }
+      document.querySelectorAll('.mood-icon').forEach(el => el.classList.remove('selected'));
+    }
+
+    /* ----------------- Chart setup ----------------- */
+    const moodCtx = document.getElementById('moodChart').getContext('2d');
+    const moodChart = new Chart(moodCtx, {
+      type: 'line',
+      data: {
+        labels: ['Day -6', 'Day -5', 'Day -4', 'Day -3', 'Day -2', 'Day -1', 'Today'],
+        datasets: [
+          {
+            label: 'Neutral %',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(148,163,184,0.1)',
+            borderColor: '#94A3B8',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Relieved %',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(16,185,129,0.1)',
+            borderColor: '#10B981',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Angry %',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(239,68,68,0.1)',
+            borderColor: '#EF4444',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Happy %',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(236,72,153,0.1)',
+            borderColor: '#EC4899',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Stressed %',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(249,115,22,0.1)',
+            borderColor: '#F97316',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' }
+        }
+      }
+    });
+
+    function updateMoodChartFromLog() {
+      const now = Date.now();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const buckets = Array.from({ length: 7 }, (_, i) => ({ neutral: 0, relieved: 0, angry: 0, happy: 0, stressed: 0, total: 0 }));
+      localStore.moodLog.forEach(entry => {
+        const daysAgo = Math.floor((now - entry.ts) / dayMs);
+        if (daysAgo < 7) {
+          const idx = 6 - daysAgo;
+          buckets[idx].total++;
+          if (entry.mood === 'neutral') buckets[idx].neutral++;
+          if (entry.mood === 'relieved') buckets[idx].relieved++;
+          if (entry.mood === 'angry') buckets[idx].angry++;
+          if (entry.mood === 'happy') buckets[idx].happy++;
+          if (entry.mood === 'stressed') buckets[idx].stressed++;
+        }
+      });
+
+      moodChart.data.datasets[0].data = buckets.map(b => b.total ? Math.round((b.neutral / b.total) * 100) : 0);
+      moodChart.data.datasets[1].data = buckets.map(b => b.total ? Math.round((b.relieved / b.total) * 100) : 0);
+      moodChart.data.datasets[2].data = buckets.map(b => b.total ? Math.round((b.angry / b.total) * 100) : 0);
+      moodChart.data.datasets[3].data = buckets.map(b => b.total ? Math.round((b.happy / b.total) * 100) : 0);
+      moodChart.data.datasets[4].data = buckets.map(b => b.total ? Math.round((b.stressed / b.total) * 100) : 0);
+      moodChart.update();
+    }
+
+    /* ----------------- Modal helper ----------------- */
+    const modalBackdrop = document.getElementById('modalBackdrop'), modalContent = document.getElementById('modalContent');
+    function openModal(html, isLarge = false) {
+      if (isLarge) modalContent.classList.add('modal-lg');
+      else modalContent.classList.remove('modal-lg');
+      modalContent.innerHTML = html;
+      modalBackdrop.style.display = 'flex';
+      modalBackdrop.setAttribute('aria-hidden', 'false');
+    }
+    function closeModal() {
+      modalBackdrop.style.display = 'none';
+      modalContent.innerHTML = '';
+      modalContent.classList.remove('modal-lg');
+      modalBackdrop.setAttribute('aria-hidden', 'true');
+    }
+    modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop) closeModal(); });
+
+    /* ----------------- Focus timer ----------------- */
+    let focusTimer = null, focusRemaining = 0, focusTotal = 0, isBreakMode = false;
+    function formatMMSS(s) { s = Math.max(0, Math.floor(s)); const mm = String(Math.floor(s / 60)).padStart(2, '0'); const ss = String(s % 60).padStart(2, '0'); return `${mm}:${ss}`; }
+
+    function setFocusTime(mins, btn) {
+      document.getElementById('focusDuration').value = mins;
+      // Update UI
+      document.querySelectorAll('.focus-preset').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    function openFocusModal() {
+      const dur = parseInt(document.getElementById('focusDuration').value || 25, 10);
+      const breakDur = parseInt(document.getElementById('focusBreak').value || 5, 10);
+
+      openModal(`
+      <div class="text-center p-4">
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">Deep Focus Session</h3>
+        <p class="text-gray-500 text-sm mb-8">Eliminate distractions. Stay focused for ${dur} minutes.</p>
+        
+        <div class="relative w-64 h-64 mx-auto mb-10">
+           <svg class="w-full h-full transform -rotate-90">
+             <circle cx="128" cy="128" r="110" stroke="#F3F4F6" stroke-width="12" fill="none" />
+             <circle id="focusRing" cx="128" cy="128" r="110" stroke="#7C3AED" stroke-width="12" fill="none" 
+               stroke-dasharray="691.15" stroke-dashoffset="691.15" stroke-linecap="round" class="transition-all duration-1000" />
+           </svg>
+           <div class="absolute inset-0 flex flex-col items-center justify-center">
+             <span id="focusTimeText" class="text-5xl font-black text-gray-800 tracking-tight">${formatMMSS(dur * 60)}</span>
+             <span class="text-xs uppercase tracking-[0.2em] font-bold text-gray-400 mt-2">Time Remaining</span>
+           </div>
+        </div>
+
+        <div class="flex gap-4 justify-center">
+          <button id="focusActionBtn" class="px-10 py-3 bg-purple-600 text-white rounded-2xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-100" onclick="startFocus(${dur})">Start</button>
+          <button class="px-10 py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition" onclick="resetFocus()">Reset</button>
+        </div>
+        
+        <button class="mt-8 text-sm font-semibold text-gray-400 hover:text-red-500 transition" onclick="closeModal()">End Session</button>
+      </div>`);
+
+      focusTotal = dur * 60;
+      focusRemaining = focusTotal;
+      isBreakMode = false;
+      updateFocusUI();
+    }
+
+    function startFocus(mins) {
+      if (focusTimer) {
+        pauseFocus();
+        return;
+      }
+
+      logActivity(isBreakMode ? 'Started break session' : 'Started deep focus session', 'focus');
+
+      const btn = document.getElementById('focusActionBtn');
+      if (btn) {
+        btn.textContent = 'Pause';
+        const activeColor = isBreakMode ? 'bg-emerald-500' : 'bg-amber-500';
+        const shadowColor = isBreakMode ? 'shadow-emerald-100' : 'shadow-amber-100';
+
+        btn.className = `px-10 py-3 ${activeColor} text-white rounded-2xl font-bold transition shadow-lg ${shadowColor}`;
+      }
+
+      focusTimer = setInterval(() => {
+        focusRemaining--;
+        updateFocusUI();
+        if (focusRemaining <= 0) {
+          clearInterval(focusTimer);
+          focusTimer = null;
+          playSound('chime');
+
+          if (!isBreakMode) {
+            // Transition to Break
+            isBreakMode = true;
+            const breakMins = parseInt(document.getElementById('focusBreak').value || 5, 10);
+            focusTotal = breakMins * 60;
+            focusRemaining = focusTotal;
+
+            // Update Modal UI for Break
+            const titleEl = modalContent.querySelector('h3');
+            const subEl = modalContent.querySelector('p');
+            const ring = document.getElementById('focusRing');
+
+            if (titleEl) titleEl.textContent = 'Rest & Recharge';
+            if (subEl) subEl.textContent = `Focus complete! Enjoy a ${breakMins} minute break.`;
+            if (ring) ring.style.stroke = '#10B981'; // Green for break
+
+            toast('Focus session complete! Break starting...');
+            spawnPop('🎉', 20);
+
+            // Auto start break
+            startFocus();
+          } else {
+            // Break Finished
+            modalContent.innerHTML = `
+               <div class="text-center p-8">
+                 <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">🏁</div>
+                 <h3 class="text-2xl font-bold text-gray-800 mb-2">Cycle Complete!</h3>
+                 <p class="text-gray-500 mb-8">You're refreshed and ready for another session.</p>
+                 <button class="w-full py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg" onclick="resetAndRestartFocus()">Start Next Round</button>
+                 <button class="w-full py-4 mt-2 bg-gray-100 text-gray-600 rounded-2xl font-bold" onclick="closeModal()">Finish for Now</button>
+               </div>
+             `;
+            toast('Break complete! Ready to focus?');
+            spawnPop('✨', 15);
+          }
+        }
+      }, 1000);
+      playSound('notify');
+    }
+
+    function resetAndRestartFocus() {
+      const dur = parseInt(document.getElementById('focusDuration').value || 25, 10);
+      openFocusModal();
+      startFocus(dur);
+    }
+
+    function pauseFocus() {
+      if (focusTimer) {
+        clearInterval(focusTimer);
+        focusTimer = null;
+        playSound('notify');
+
+        const btn = document.getElementById('focusActionBtn');
+        if (btn) {
+          btn.textContent = 'Resume';
+          const baseColor = isBreakMode ? 'bg-emerald-600' : 'bg-purple-600';
+          btn.className = `px-10 py-3 ${baseColor} text-white rounded-2xl font-bold transition shadow-lg`;
+        }
+      }
+    }
+
+    function resetFocus() {
+      if (focusTimer) {
+        clearInterval(focusTimer);
+        focusTimer = null;
+      }
+      const dur = isBreakMode ? parseInt(document.getElementById('focusBreak').value || 5, 10) : parseInt(document.getElementById('focusDuration').value || 25, 10);
+      focusRemaining = dur * 60;
+      updateFocusUI();
+
+      const btn = document.getElementById('focusActionBtn');
+      if (btn) {
+        btn.textContent = 'Start';
+        const baseColor = isBreakMode ? 'bg-emerald-600' : 'bg-purple-600';
+        btn.className = `px-10 py-3 ${baseColor} text-white rounded-2xl font-bold transition shadow-lg`;
+      }
+    }
+
+    function updateFocusUI() {
+      const el = document.getElementById('focusTimeText');
+      if (el) el.textContent = formatMMSS(focusRemaining);
+      const ring = document.getElementById('focusRing');
+      if (ring && focusTotal > 0) {
+        const pct = focusRemaining / focusTotal;
+        ring.style.strokeDashoffset = String(691.15 * (1 - pct));
+      }
+    }
+
+    /* ----------------- Meditation & Wellness ----------------- */
+    let medTimer = null, medRemaining = 0, medTotal = 0;
+    function startMeditation(minutes) {
+      logActivity(`Started meditation: ${minutes} minutes`, 'wellness');
+      openModal(`<div class="text-center p-2">
+        <h3 class="text-2xl font-bold text-gray-800 mb-1">Guided Meditation</h3>
+        <p class="text-gray-500 text-sm mb-6">Find a comfortable position and focus on your breath.</p>
+        
+        <div class="relative w-48 h-48 mx-auto mb-8">
+           <svg class="w-full h-full transform -rotate-90">
+             <circle cx="96" cy="96" r="88" stroke="#F3F4F6" stroke-width="8" fill="none" />
+             <circle id="medProgressRing" cx="96" cy="96" r="88" stroke="#EC4899" stroke-width="8" fill="none" 
+               stroke-dasharray="552.9" stroke-dashoffset="552.9" stroke-linecap="round" class="transition-all duration-1000" />
+           </svg>
+           <div class="absolute inset-0 flex flex-col items-center justify-center">
+             <span id="medTimeText" class="text-4xl font-bold text-gray-800">${formatMMSS(minutes * 60)}</span>
+             <span class="text-xs uppercase tracking-widest text-gray-400 mt-1">Remaining</span>
+           </div>
+        </div>
+
+        <div class="flex gap-4 justify-center">
+          <button id="medActionBtn" class="px-10 py-3 bg-pink-600 text-white rounded-2xl font-bold hover:bg-pink-700 transition shadow-lg shadow-pink-100" onclick="toggleMedit()">Start Session</button>
+          <button class="px-10 py-3 bg-gray-100 text-red-500 rounded-2xl font-bold hover:bg-red-50 transition" onclick="endMedit()">End Session</button>
+        </div>
+      </div>`);
+      medTotal = minutes * 60; medRemaining = medTotal; updateMedUI();
+    }
+    function toggleMedit() {
+      if (medTimer) {
+        pauseMedit();
+      } else {
+        startMeditTimer();
+      }
+    }
+    function startMeditTimer() {
+      if (medTimer) return;
+      const btn = document.getElementById('medActionBtn');
+      if (btn) btn.textContent = 'Pause';
+
+      medTimer = setInterval(() => {
+        medRemaining--;
+        updateMedUI();
+        if (medRemaining <= 0) {
+          clearInterval(medTimer);
+          medTimer = null;
+          playSound('chime');
+          closeModal();
+          toast('Meditation complete');
+        }
+      }, 1000);
+      playSound('notify');
+    }
+    function pauseMedit() {
+      if (medTimer) {
+        clearInterval(medTimer);
+        medTimer = null;
+        const btn = document.getElementById('medActionBtn');
+        if (btn) btn.textContent = 'Resume';
+      }
+    }
+    function endMedit() { if (medTimer) clearInterval(medTimer); medTimer = null; closeModal(); }
+    function updateMedUI() {
+      const el = document.getElementById('medTimeText');
+      if (el) el.textContent = formatMMSS(medRemaining);
+      const ring = document.getElementById('medProgressRing');
+      if (ring && medTotal > 0) {
+        const pct = medRemaining / medTotal;
+        ring.style.strokeDashoffset = 552.9 * (1 - pct);
+      }
+    }
+
+    /* ----------------- Breathing + Eye ----------------- */
+    let breathAnim = null, breathing = false;
+    function openBreathing() {
+      openModal(`<div class="text-center p-2">
+        <h3 class="text-2xl font-bold text-gray-800 mb-1">Breathing Exercise</h3>
+        <p class="text-gray-500 text-sm mb-6">Master the 4-7-8 rhythm for deep tranquility.</p>
+        
+        <div class="flex justify-center gap-4 mb-2">
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-blue-500">INHALE</span>
+            <span class="text-[10px] text-gray-400">4 SEC</span>
+          </div>
+          <div class="w-4 h-[1px] bg-gray-200 mt-2"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-purple-500">HOLD</span>
+            <span class="text-[10px] text-gray-400">7 SEC</span>
+          </div>
+          <div class="w-4 h-[1px] bg-gray-200 mt-2"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-pink-500">EXHALE</span>
+            <span class="text-[10px] text-gray-400">8 SEC</span>
+          </div>
+        </div>
+
+        <div class="relative w-72 h-72 mx-auto mb-6">
+           <canvas id="breathCanvas" width="300" height="300" class="w-full h-full"></canvas>
+        </div>
+
+        <div class="flex gap-4 justify-center">
+          <button id="breathActionBtn" class="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100" onclick="toggleBreathing()">Start Exercise</button>
+          <button class="px-10 py-3 bg-gray-100 text-red-500 rounded-2xl font-bold hover:bg-red-50 transition" onclick="closeModal()">End Session</button>
+        </div>
+      </div>`);
+
+      const canvas = document.getElementById('breathCanvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+        ctx.beginPath();
+        ctx.arc(150, 150, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#64748b';
+        ctx.font = '600 16px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Ready?', 150, 150);
+      }
+    }
+    function toggleBreathing() {
+      if (breathing) {
+        stopBreathing();
+      } else {
+        startBreathing();
+      }
+    }
+    function startBreathing() {
+      if (breathing) return;
+      logActivity('Started breathing exercise', 'wellness');
+      breathing = true;
+      const actionBtn = document.getElementById('breathActionBtn');
+      if (actionBtn) actionBtn.textContent = 'Pause';
+
+      const canvas = document.getElementById('breathCanvas'); if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let startTime = Date.now();
+
+      function frame() {
+        if (!breathing) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const w = canvas.width, h = canvas.height;
+        const maxR = 120;
+        const minR = 40;
+
+        let elapsed = (Date.now() - startTime) / 1000;
+        let cycleTime = elapsed % 19; // 4 + 7 + 8 = 19s
+
+        let r, phase, countdown, color;
+        if (cycleTime < 4) {
+          phase = 'Inhale';
+          r = minR + (maxR - minR) * (cycleTime / 4);
+          countdown = Math.ceil(4 - cycleTime);
+          color = 'rgba(59, 130, 246, 0.2)'; // Blue
+        } else if (cycleTime < 11) {
+          phase = 'Hold';
+          r = maxR;
+          countdown = Math.ceil(11 - cycleTime);
+          color = 'rgba(168, 85, 247, 0.2)'; // Purple
+        } else {
+          phase = 'Exhale';
+          r = maxR - (maxR - minR) * ((cycleTime - 11) / 8);
+          countdown = Math.ceil(19 - cycleTime);
+          color = 'rgba(236, 72, 153, 0.2)'; // Pink
+        }
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = color.replace('0.2', '0.5');
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#2D1E3A';
+        ctx.font = '700 28px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(phase, w / 2, h / 2 - 15);
+        ctx.font = '600 22px Inter';
+        ctx.fillText(countdown, w / 2, h / 2 + 25);
+
+        breathAnim = requestAnimationFrame(frame);
+      }
+      frame();
+    }
+    function stopBreathing() {
+      breathing = false;
+      if (breathAnim) cancelAnimationFrame(breathAnim);
+      const actionBtn = document.getElementById('breathActionBtn');
+      if (actionBtn) actionBtn.textContent = 'Resume';
+    }
+
+    let eyeTimer = null, eyeRemaining = 0, isEyeNear = true;
+    function openEyeExercise() {
+      openModal(`<div class="text-center p-2">
+        <h3 class="text-2xl font-bold text-gray-800 mb-1">Eye Relief</h3>
+        <p class="text-gray-500 text-sm mb-6">The 20-20-20 rule helps reduce digital eye strain.</p>
+        
+        <div class="flex justify-around items-center mb-8 px-4">
+           <div id="eyeNearIcon" class="flex flex-col items-center opacity-100 transition-opacity duration-500">
+              <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-3xl mb-2">📱</div>
+              <span class="text-xs font-bold text-gray-400">NEAR</span>
+           </div>
+           <div class="relative w-24 h-24">
+              <svg class="w-full h-full transform -rotate-90">
+                <circle cx="48" cy="48" r="42" stroke="#F3F4F6" stroke-width="6" fill="none" />
+                <circle id="eyeProgressRing" cx="48" cy="48" r="42" stroke="#3B82F6" stroke-width="6" fill="none" 
+                  stroke-dasharray="263.9" stroke-dashoffset="0" stroke-linecap="round" class="transition-all duration-1000" />
+              </svg>
+              <div id="eyeTime" class="absolute inset-0 flex items-center justify-center font-bold text-gray-700">20s</div>
+           </div>
+           <div id="eyeFarIcon" class="flex flex-col items-center opacity-30 transition-opacity duration-500">
+              <div class="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-3xl mb-2">🌳</div>
+              <span class="text-xs font-bold text-gray-400">FAR</span>
+           </div>
+        </div>
+
+        <div id="eyeText" class="text-lg font-semibold text-blue-600 mb-6 font-medium">Focus on a near object</div>
+
+        <div class="flex gap-3 justify-center">
+          <button id="eyeStartBtn" class="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100" onclick="startEye()">Start Exercise</button>
+          <button class="px-6 py-2 bg-gray-100 text-gray-600 rounded-xl font-semibold hover:bg-gray-200 transition" onclick="endEye()">Close</button>
+        </div>
+      </div>`);
+      eyeRemaining = 20; isEyeNear = true; updateEyeUI();
+    }
+    function startEye() {
+      if (eyeTimer) return;
+      logActivity('Started eye relief exercise', 'wellness');
+      const startBtn = document.getElementById('eyeStartBtn');
+      if (startBtn) startBtn.style.display = 'none';
+
+      eyeTimer = setInterval(() => {
+        eyeRemaining--;
+        updateEyeUI();
+        if (eyeRemaining <= 0) {
+          isEyeNear = !isEyeNear;
+          eyeRemaining = 20;
+
+          const textEl = document.getElementById('eyeText');
+          const nearIcon = document.getElementById('eyeNearIcon');
+          const farIcon = document.getElementById('eyeFarIcon');
+          const ring = document.getElementById('eyeProgressRing');
+
+          if (isEyeNear) {
+            textEl.textContent = 'Focus on a near object';
+            textEl.className = 'text-lg font-semibold text-blue-600 mb-6';
+            nearIcon.style.opacity = '1';
+            farIcon.style.opacity = '0.3';
+            ring.style.stroke = '#3B82F6';
+            toast('Phase complete: Look at something near');
+          } else {
+            textEl.textContent = 'Look at something 20ft away';
+            textEl.className = 'text-lg font-semibold text-green-600 mb-6';
+            nearIcon.style.opacity = '0.3';
+            farIcon.style.opacity = '1';
+            ring.style.stroke = '#10B981';
+            toast('Phase complete: Look at something far');
+          }
+          playSound('chime');
+        }
+      }, 1000);
+      playSound('notify');
+    }
+    function endEye() { if (eyeTimer) clearInterval(eyeTimer); eyeTimer = null; closeModal(); }
+    function updateEyeUI() {
+      const el = document.getElementById('eyeTime');
+      if (el) el.textContent = eyeRemaining + 's';
+      const ring = document.getElementById('eyeProgressRing');
+      if (ring) {
+        ring.style.strokeDashoffset = 263.9 * (1 - (eyeRemaining / 20));
+      }
+    }
+
+    /* ----------------- Music player (Disabled) ----------------- */
+
+    function playAmbient() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const master = ctx.createGain(); master.gain.value = 0.02; master.connect(ctx.destination);
+        const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator();
+        o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = 220; o2.frequency.value = 221.7;
+        const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 1200;
+        o1.connect(lpf); o2.connect(lpf); lpf.connect(master);
+        o1.start(); o2.start();
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; lfo.type = 'sine'; const lfoGain = ctx.createGain(); lfoGain.gain.value = 60;
+        lfo.connect(lfoGain); lfoGain.connect(o1.frequency); lfo.start();
+        return () => { try { o1.stop(); o2.stop(); lfo.stop(); ctx.close(); } catch (e) { } };
+      } catch (e) { return null; }
+    }
+
+    /* ----------------- Local persistence helpers ----------------- */
+    function saveLocal() {
+      localStorage.setItem('em_columns', JSON.stringify(localStore.columns));
+
+      localStorage.setItem('em_moodLog', JSON.stringify(localStore.moodLog));
+      localStorage.setItem('em_mood', localStore.mood);
+      localStorage.setItem('em_user', localStore.user);
+    }
+
+    /* ----------------- Tasks & board ----------------- */
+    function renderBoard() {
+      const wrap = document.getElementById('taskBoardWrap'); wrap.innerHTML = '';
+
+      localStore.columns.forEach(col => {
+        const colEl = document.createElement('div');
+        colEl.className = 'task-column';
+        colEl.dataset.col = col.id;
+
+        // Custom colors for known columns
+        let accentColor = '#64748b'; // default slate
+        if (col.id.includes('todo')) accentColor = '#F59E0B'; // amber for todo
+        if (col.id.includes('inprogress')) accentColor = '#3B82F6'; // blue for progress
+        if (col.id.includes('done')) accentColor = '#10B981'; // green for done
+
+        colEl.innerHTML = `
+        <div class="flex justify-between items-center mb-4 px-1">
+          <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full" style="background:${accentColor}"></div>
+            <h3 class="text-lg font-bold text-gray-800 tracking-tight">${escapeHtml(col.name)}</h3>
+            <span class="column-header-badge">${col.tasks.length}</span>
+          </div>
+          <div class="flex gap-1 opacity-40 hover:opacity-100 transition-opacity">
+            <button class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white hover:shadow-sm transition" onclick="renameColumnPrompt('${col.id}')" title="Rename">✎</button>
+            <button class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50 hover:text-red-500 transition" onclick="deleteColumn('${col.id}')" title="Delete">×</button>
+            <button class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm text-blue-600 hover:scale-110 transition" onclick="openAddTaskModal('${col.id}')" title="Add Task">+</button>
+          </div>
+        </div>
+        <div id="col-${col.id}" class="task-list flex-1 overflow-y-auto pr-1 custom-scrollbar" style="min-height:50px"></div>`;
+
+        wrap.appendChild(colEl);
+        const list = colEl.querySelector('.task-list');
+
+        col.tasks.forEach(t => list.appendChild(createTaskElement(t, col.id, accentColor)));
+      });
+      makeTasksDraggable();
+    }
+
+    function createTaskElement(task, colId, accentColor) {
+      const el = document.createElement('div');
+      el.className = 'task-card';
+      el.draggable = true;
+      el.dataset.id = task.id;
+      // Override default accent color per card based on column
+      el.style.setProperty('--dominant-pink', accentColor || '#EC4899');
+
+      const memberAvatars = (task.members || []).map(m => {
+        const i = m.trim().charAt(0).toUpperCase();
+        return `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white font-bold" title="${escapeHtml(m)}">${i}</div>`
+      }).join('');
+
+      const subtaskProgress = (task.subtasks && task.subtasks.length > 0)
+        ? `<div class="mt-3 flex items-center gap-2 text-xs text-gray-400 font-medium">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+             ${task.subtasks.length} subtasks
+           </div>`
+        : '';
+
+      const tags = `<span class="bg-gray-100 text-gray-500 px-2 py-1 rounded-md text-xs font-semibold uppercase tracking-wider">Task</span>`;
+
+      el.innerHTML = `
+      <div class="flex justify-between items-start">
+        <div class="mt-1">${tags}</div>
+        <div class="flex gap-1">
+           <button class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-500 transition" onclick="openTaskEditor('${task.id}','${colId}')">✏️</button>
+           <button class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition" onclick="deleteTask('${task.id}','${colId}')">🗑️</button>
+        </div>
+      </div>
+      
+      <div>
+        <div class="text-gray-900 font-bold text-lg leading-tight mb-1">${escapeHtml(task.title)}</div>
+        <div class="text-gray-500 text-sm line-clamp-2">${escapeHtml(task.meta || 'No description provided.')}</div>
+      </div>
+      
+      ${subtaskProgress}
+      
+      <div class="mt-auto pt-3 flex items-center justify-between border-t border-gray-50">
+        <div class="flex -space-x-2 overflow-hidden">
+          ${memberAvatars || '<span class="text-xs text-gray-400 italic">Unassigned</span>'}
+        </div>
+        <div class="text-xs text-gray-400 font-mono">${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
+      </div>`;
+
+      return el;
+    }
+
+    function createColumnLocal(name) {
+      const id = 'col-' + Date.now();
+      localStore.columns.push({ id, name, tasks: [] });
+      saveLocal();
+      renderBoard();
+    }
+    function deleteColumn(id) {
+      if (!confirm('Delete this section and all its tasks?')) return;
+      localStore.columns = localStore.columns.filter(c => c.id !== id);
+      saveLocal(); renderBoard(); toast('Section deleted');
+    }
+    function renameColumnPrompt(id) {
+      const col = localStore.columns.find(c => c.id === id); if (!col) return;
+      openModal(`
+        <div class="bg-white p-8 space-y-6 text-center">
+          <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center text-3xl mx-auto mb-2">🏷️</div>
+          <div>
+            <h3 class="text-xl font-black text-slate-800">Rename Section</h3>
+            <p class="text-slate-400 text-sm font-medium">Update the title for this board space</p>
+          </div>
+          <input id="renameColInput" type="text" value="${escapeHtml(col.name)}" 
+            class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-400 focus:bg-white outline-none transition-all font-bold text-center text-slate-800" />
+          <div class="flex gap-4">
+            <button onclick="closeModal()" class="flex-1 py-4 bg-slate-100 text-slate-400 font-bold rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-200 transition-all">Cancel</button>
+            <button onclick="saveColumnRename('${id}')" class="flex-[2] py-4 bg-indigo-600 text-white font-bold rounded-2xl uppercase tracking-widest text-xs hover:shadow-lg hover:shadow-indigo-500/30 transition-all">Update Name</button>
+          </div>
+        </div>
+      `);
+    }
+
+    window.saveColumnRename = (id) => {
+      const nv = document.getElementById('renameColInput').value.trim();
+      if (nv) {
+        const col = localStore.columns.find(c => c.id === id);
+        if (col) {
+          col.name = nv;
+          saveLocal();
+          renderBoard();
+          toast('Section renamed');
+        }
+      }
+      closeModal();
+    };
+
+    function openAddTaskModal(colId) {
+      openModal(`
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 flex justify-between items-center text-white flex-shrink-0">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
+                <i data-lucide="clipboard-list" class="w-7 h-7"></i>
+              </div>
+              <div>
+                <h3 class="text-2xl font-black tracking-tight uppercase">New Task Entry</h3>
+                <p class="text-white/70 text-xs font-bold uppercase tracking-widest pl-0.5">Define your next milestone</p>
+              </div>
+            </div>
+            <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
+              <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+          </div>
+          
+          <div class="modal-content-wrapper p-8 space-y-8 custom-scrollbar">
+            <div class="space-y-3">
+              <label class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] ml-1">Task Name</label>
+              <input id="newTaskTitle" type="text" placeholder="Enter task name..." 
+                class="w-full px-6 py-4 bg-blue-50/30 border-2 border-blue-100/50 rounded-[1.5rem] focus:border-blue-500 focus:bg-white focus:shadow-xl focus:shadow-blue-500/10 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300" />
+            </div>
+
+            <div class="space-y-3">
+              <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Context & Description</label>
+              <textarea id="newTaskMeta" rows="3" placeholder="What needs to be done?" 
+                class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-blue-500 focus:bg-white focus:shadow-xl focus:shadow-blue-500/5 outline-none transition-all text-slate-600 font-medium placeholder:text-slate-300 resize-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Sub-Objectives</label>
+                <div class="relative group">
+                  <i data-lucide="list" class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-blue-500 transition-colors"></i>
+                  <input id="newTaskSubs" type="text" placeholder="Step 1, Step 2..." 
+                    class="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300" />
+                </div>
+              </div>
+              <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Collaborators</label>
+                <div class="relative group">
+                  <i data-lucide="user-plus" class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
+                  <input id="newTaskMembers" type="text" placeholder="Assign someone..." 
+                    class="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300" />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 pt-6">
+              <button onclick="closeModal()" 
+                class="flex-1 px-8 py-5 rounded-[1.5rem] font-black text-slate-400 bg-slate-100 hover:bg-slate-200 hover:text-slate-600 transition-all uppercase tracking-widest text-xs">
+                Cancel
+              </button>
+              <button onclick="addTaskToColumn('${colId}')" 
+                class="flex-[2] px-8 py-5 rounded-[1.5rem] font-black text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:shadow-2xl hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-widest text-xs">
+                Create Task
+              </button>
+            </div>
+          </div>
+      `);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function addTaskToColumn(colId) {
+      const title = document.getElementById('newTaskTitle').value.trim();
+      if (!title) { toast('Add a title'); return; }
+      const meta = document.getElementById('newTaskMeta').value.trim();
+      const subs = document.getElementById('newTaskSubs').value.trim();
+      const members = document.getElementById('newTaskMembers').value.trim();
+
+      const column = colId.replace('col-', '');
+      const taskData = {
+        title,
+        description: meta,
+        subtasks: subs ? subs.split(',').map(s => s.trim()) : [],
+        members: members ? members.split(',').map(s => s.trim()) : [],
+        column
+      };
+
+      if (currentUser && currentUser.id && currentUser.id !== 'local-user') {
+        try {
+          const response = await apiCall(`/tasks/${currentUser.id}`, {
+            method: 'POST',
+            body: JSON.stringify(taskData)
+          });
+          if (response.success) {
+            await loadTasks();
+            closeModal();
+            toast('Task added');
+
+            // SYNC PROJECT STRING if added directly to In Progress
+            if (column === 'inprogress' || column === 'In Progress') {
+              apiCall(`/users/${currentUser.id}/project`, {
+                method: 'PUT',
+                body: JSON.stringify({ autoSync: true })
+              }).then(res => {
+                if (res.success && res.project !== undefined) {
+                  currentUser.currentProject = res.project;
+                  const projEl = document.getElementById('current-project');
+                  if (projEl) projEl.textContent = res.project || '—';
+                }
+              }).catch(e => console.error('Project sync error:', e));
+            }
+            return;
+          }
+        } catch (e) { console.error('API Error:', e); }
+      }
+
+      // Local fallback
+      const task = { id: 't' + Date.now(), ...taskData, meta };
+      const col = localStore.columns.find(c => c.id === colId);
+      col.tasks.push(task);
+      saveLocal(); closeModal(); renderBoard(); toast('Task added locally');
+    }
+
+    function openTaskEditor(taskId, colId) {
+      const col = localStore.columns.find(c => c.id === colId); if (!col) return;
+      const task = col.tasks.find(t => t.id === taskId); if (!task) return;
+
+      openModal(`
+          <div class="bg-gradient-to-r from-emerald-500 to-teal-700 px-8 py-6 flex justify-between items-center text-white flex-shrink-0">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
+                <i data-lucide="edit-3" class="w-7 h-7"></i>
+              </div>
+              <div>
+                <h3 class="text-2xl font-black tracking-tight uppercase">Update Task Details</h3>
+                <p class="text-white/70 text-xs font-bold uppercase tracking-widest pl-0.5">Refining your objectives</p>
+              </div>
+            </div>
+            <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
+              <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+          </div>
+          
+          <div class="modal-content-wrapper p-8 space-y-8 custom-scrollbar">
+            <div class="space-y-3">
+              <label class="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] ml-1">Task Name</label>
+              <input id="editTitle" type="text" value="${escapeHtml(task.title)}" placeholder="Enter task name..." 
+                class="w-full px-6 py-4 bg-emerald-50/30 border-2 border-emerald-100/50 rounded-[1.5rem] focus:border-emerald-500 focus:bg-white focus:shadow-xl focus:shadow-emerald-500/10 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300" />
+            </div>
+
+            <div class="space-y-3">
+              <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Task Description</label>
+              <textarea id="editMeta" rows="3" placeholder="Add more context..." 
+                class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-emerald-500 focus:bg-white focus:shadow-xl focus:shadow-emerald-500/5 outline-none transition-all text-slate-600 font-medium placeholder:text-slate-300 resize-none">${escapeHtml(task.meta || '')}</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Sub-Steps (Break it down)</label>
+                <div class="relative group">
+                  <textarea id="editSubs" rows="4" placeholder="Step 1\\nStep 2..." 
+                    class="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-emerald-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300 resize-none">${(task.subtasks || []).map(s => escapeHtml(s)).join('\n')}</textarea>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Team Assignment</label>
+                <div class="relative group h-full">
+                  <i data-lucide="users" class="absolute left-5 top-6 w-5 h-5 text-slate-300 group-focus-within:text-emerald-500 transition-colors"></i>
+                  <input id="editMembers" type="text" value="${(task.members || []).join(', ')}" placeholder="Assign owners..." 
+                    class="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-emerald-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300" />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 pt-6">
+              <button onclick="closeModal()" 
+                class="flex-1 px-8 py-5 rounded-[1.5rem] font-black text-slate-400 bg-slate-100 hover:bg-slate-200 hover:text-slate-600 transition-all uppercase tracking-widest text-xs">
+                Discard Changes
+              </button>
+              <button onclick="saveTaskEdits('${taskId}','${colId}')" 
+                class="flex-[2] px-8 py-5 rounded-[1.5rem] font-black text-white bg-gradient-to-r from-emerald-500 to-teal-700 hover:shadow-2xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-widest text-xs">
+                Sync Details
+              </button>
+            </div>
+          </div>
+      `);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function saveTaskEdits(id, colId) {
+      const col = localStore.columns.find(c => c.id === colId); if (!col) return;
+      const task = col.tasks.find(t => t.id === id); if (!task) return;
+
+      const title = document.getElementById('editTitle').value.trim();
+      const meta = document.getElementById('editMeta').value.trim();
+      const subtasks = document.getElementById('editSubs').value.split(/\n/).map(s => s.trim()).filter(Boolean);
+      const members = document.getElementById('editMembers').value.split(',').map(s => s.trim()).filter(Boolean);
+
+      if (currentUser && currentUser.id && currentUser.id !== 'local-user' && !String(id).startsWith('t')) {
+        try {
+          const response = await apiCall(`/tasks/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ title, description: meta, subtasks, members })
+          });
+          if (response.success) {
+            await loadTasks();
+            closeModal();
+            toast('Task updated');
+            return;
+          }
+        } catch (e) { console.error('API Error:', e); }
+      }
+
+      task.title = title;
+      task.meta = meta;
+      task.subtasks = subtasks;
+      task.members = members;
+      saveLocal(); closeModal(); renderBoard(); toast('Task updated locally');
+    }
+
+    function openAssignMembers(taskId, colId) { openTaskEditor(taskId, colId); }
+
+    async function deleteTask(id, colId) {
+      if (!confirm('Delete task?')) return;
+
+      if (currentUser && currentUser.id && currentUser.id !== 'local-user' && !String(id).startsWith('t')) {
+        try {
+          const response = await apiCall(`/tasks/${id}`, { method: 'DELETE' });
+          if (response.success) {
+            await loadTasks();
+            toast('Task deleted');
+            return;
+          }
+        } catch (e) { console.error('API Error:', e); }
+      }
+
+      const col = localStore.columns.find(c => c.id === colId); if (!col) return;
+      col.tasks = col.tasks.filter(t => t.id !== id);
+      saveLocal(); renderBoard(); toast('Task deleted locally');
+    }
+
+    /* Drag & drop for tasks */
+    function makeTasksDraggable() {
+      document.querySelectorAll('.task-card').forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', card.dataset.id);
+          e.target.classList.add('dragging');
+        });
+        card.addEventListener('dragend', (e) => { e.target.classList.remove('dragging'); });
+      });
+
+      document.querySelectorAll('.task-column').forEach(colEl => {
+        colEl.addEventListener('dragover', (e) => { e.preventDefault(); colEl.style.background = '#f1f5f9'; });
+        colEl.addEventListener('dragleave', () => { colEl.style.background = ''; });
+        colEl.addEventListener('drop', (e) => {
+          e.preventDefault(); colEl.style.background = '';
+          const id = e.dataTransfer.getData('text/plain');
+          if (!id) return;
+          let movedTask = null;
+          let fromColId = null;
+          let fromColName = '';
+
+          // Find source column and task
+          for (const c of localStore.columns) {
+            const idx = c.tasks.findIndex(x => x.id === id);
+            if (idx > -1) {
+              movedTask = c.tasks.splice(idx, 1)[0];
+              fromColId = c.id;
+              fromColName = c.name;
+              break;
+            }
+          }
+          if (!movedTask) return;
+
+          const toColId = colEl.dataset.col;
+          const toCol = localStore.columns.find(c => c.id === toColId);
+          toCol.tasks.push(movedTask);
+          saveLocal(); renderBoard();
+
+          const column = toColId.replace('col-', '');
+          if (currentUser && currentUser.id && currentUser.id !== 'local-user' && !String(id).startsWith('t')) {
+            apiCall(`/tasks/${id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ column })
+            }).then(() => {
+              toast('Task moved & synced');
+              // Optionally reload to ensure state is perfect
+              loadTasks();
+            }).catch(e => {
+              console.error('Move sync failed:', e);
+              toast('Task moved locally');
+            });
+          } else {
+            toast('Task moved locally');
+          }
+
+          const isToDone = toColId === 'col-done' || toCol.name.toLowerCase() === 'done';
+          const isFromDone = fromColId === 'col-done' || fromColName.toLowerCase() === 'done';
+
+          // 1. Moving TO Done (Increment) - Only if not coming from Done
+          if (isToDone && !isFromDone) {
+            if (currentUser) {
+              currentUser.tasksCompleted = (currentUser.tasksCompleted || 0) + 1;
+              document.getElementById('tasks-completed').textContent = currentUser.tasksCompleted;
+
+              if (currentUser.id && currentUser.id !== 'local-user') {
+                apiCall(`/users/${currentUser.id}/complete-task`, { method: 'POST' })
+                  .then(() => refreshUserProfile(currentUser.id))
+                  .catch(e => console.error(e));
+              }
+              playSound('chime');
+              spawnPop('🎉', 20);
+            }
+          }
+
+          // 2. Moving FROM Done (Decrement) - Only if not going to Done
+          if (isFromDone && !isToDone) {
+            if (currentUser) {
+              currentUser.tasksCompleted = Math.max(0, (currentUser.tasksCompleted || 0) - 1);
+              document.getElementById('tasks-completed').textContent = currentUser.tasksCompleted;
+
+              if (currentUser.id && currentUser.id !== 'local-user') {
+                apiCall(`/users/${currentUser.id}/uncomplete-task`, { method: 'POST' })
+                  .then(() => refreshUserProfile(currentUser.id))
+                  .catch(e => console.error(e));
+              }
+            }
+          }
+
+          // SYNC PROJECT STRING - Check ALL In Progress tasks on server to build the string
+          if ((toColId === 'col-inprogress' || fromColId === 'col-inprogress') &&
+            currentUser && currentUser.id && currentUser.id !== 'local-user') {
+
+            // Allow the move to complete on server first (small delay or chained promise)
+            setTimeout(() => {
+              apiCall(`/users/${currentUser.id}/project`, {
+                method: 'PUT',
+                body: JSON.stringify({ autoSync: true })
+              }).then(res => {
+                if (res.success && res.project !== undefined) {
+                  currentUser.currentProject = res.project;
+                  const projEl = document.getElementById('current-project');
+                  if (projEl) projEl.textContent = res.project || '—';
+                }
+              }).catch(e => console.error('Project sync error:', e));
+            }, 500); // Wait for the column update to settle
+          }
+        });
+      });
+    }
+
+
+
+    /* ----------------- Activities display ----------------- */
+    function renderActivityRows(activities) {
+      const tbody = document.getElementById('activity-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      // Only use local fallback if we don't have activities AND we aren't connected to a real backend user
+      const isLocalUser = !currentUser || currentUser.id === 'local-user';
+
+      if ((!activities || activities.length === 0) && isLocalUser && localStore.moodLog.length > 0) {
+        activities = localStore.moodLog.slice().reverse().map(log => ({
+          ts: log.ts,
+          activity: `Mood logged: ${log.mood.charAt(0).toUpperCase() + log.mood.slice(1)}`,
+          mood: log.mood
+        }));
+      }
+
+      if (!activities || activities.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 text-center italic">No activity history found for this account.</td></tr>';
+        return;
+      }
+
+      activities.forEach(act => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 transition-colors duration-150';
+
+        let dateObj = act.ts ? new Date(act.ts) : (act.createdAt ? new Date(act.createdAt) : new Date());
+        let timeDisplay = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Add date if not today
+        const today = new Date().toLocaleDateString();
+        if (dateObj.toLocaleDateString() !== today) {
+          timeDisplay = `${dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeDisplay}`;
+        }
+
+        // Add some color to the activity text based on type if possible
+        const isMood = act.activity.toLowerCase().includes('mood');
+
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-440 font-medium">${timeDisplay}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full ${isMood ? 'bg-pink-400' : 'bg-blue-400'}"></span>
+              <span class="font-semibold">${escapeHtml(act.activity)}</span>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
+              ${escapeHtml(act.mood || '—')}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    /* ----------------- Helpers ----------------- */
+    function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+
+    /* ----------------- Event bindings ----------------- */
+    document.getElementById('addSectionBtn').addEventListener('click', () => {
+      const name = document.getElementById('newColumnName').value.trim();
+      if (!name) return toast('Enter a section name');
+      createColumnLocal(name); document.getElementById('newColumnName').value = '';
+    });
+
+    // Dashboard task button
+    document.getElementById('add-task-btn').addEventListener('click', async () => {
+      const t = document.getElementById('task-input');
+      const text = t.value.trim();
+      if (!text) return;
+
+      await saveTask({
+        title: text,
+        description: '',
+        subtasks: [],
+        members: [],
+        column: 'todo'
+      });
+
+      t.value = '';
+      toast('Task added!');
+    });
+
+    // Tasks page task button
+    document.getElementById('add-task-btn-tasks').addEventListener('click', async () => {
+      const t = document.getElementById('task-input-tasks');
+      const text = t.value.trim();
+      if (!text) return;
+
+      await saveTask({
+        title: text,
+        description: '',
+        subtasks: [],
+        members: [],
+        column: 'todo'
+      });
+
+      t.value = '';
+      toast('Task added!');
+    });
+
+
+
+    // mood buttons
+    document.querySelectorAll('.mood-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const moodKey = e.currentTarget.getAttribute('data-mood');
+        // map to emoji/labels
+        const mapping = { happy: 'happy', neutral: 'neutral', stressed: 'stressed', angry: 'angry', relieved: 'relieved' };
+        logMood(mapping[moodKey] || moodKey || 'neutral');
+      });
+    });
+
+    // Expose functions to global scope
+
+    window.openFocusModal = openFocusModal;
+    window.startMeditation = startMeditation;
+    window.toggleMedit = toggleMedit;
+    window.toggleBreathing = toggleBreathing;
+    window.openTaskEditor = openTaskEditor;
+    window.deleteTask = deleteTask;
+    window.openAddTaskModal = openAddTaskModal;
+    window.openAssignMembers = openAssignMembers;
+    window.startFocus = startFocus;
+    window.pauseFocus = pauseFocus;
+    window.resetFocus = resetFocus;
+    window.saveTaskEdits = saveTaskEdits;
+    window.createColumnLocal = createColumnLocal;
+    window.renameColumnPrompt = renameColumnPrompt;
+    window.deleteColumn = deleteColumn;
+    window.addTaskToColumn = addTaskToColumn;
+    window.setFocusTime = setFocusTime;
+    window.resetAndRestartFocus = resetAndRestartFocus;
+
+    // Sidebar Responsive Toggle
+    window.toggleSidebar = function () {
+      const sidebar = document.getElementById('mainSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (!sidebar || !backdrop) return;
+
+      const isActive = sidebar.classList.contains('sidebar-active');
+      if (isActive) {
+        sidebar.classList.remove('sidebar-active');
+        backdrop.classList.remove('active');
+      } else {
+        sidebar.classList.add('sidebar-active');
+        backdrop.classList.add('active');
+      }
+    };
+
+    // Close sidebar on nav click (mobile)
+    document.querySelectorAll('.nav-item-modern').forEach(item => {
+      item.addEventListener('click', () => {
+        if (window.innerWidth < 1024) {
+          const sidebar = document.getElementById('mainSidebar');
+          const backdrop = document.getElementById('sidebarBackdrop');
+          sidebar.classList.remove('sidebar-active');
+          backdrop.classList.remove('active');
+        }
+      });
+    });
+
+    /* ----------------- Admin Console Unified Logic ----------------- */
+    let adminSocket;
+    let unifiedAdminChart;
+    let unifiedPerformanceChart;
+    let adminUsersCache = [];
+    let adminActivitiesCache = [];
+    const adminStatsState = { totalUsers: 0, totalEmployees: 0, totalTasks: 0, moodCounts: { happy: 0, neutral: 0, stressed: 0, angry: 0, relieved: 0 } };
+
+    function initAdminConsole() {
+      const role = localStorage.getItem('empathos_role');
+      if (role !== 'Admin') return;
+
+      const adminNav = document.getElementById('nav-admin');
+      if (adminNav) adminNav.classList.remove('hidden');
+
+      initAdminSocket();
+      fetchAdminData();
+    }
+
+    function initAdminSocket() {
+      if (typeof io === 'undefined') return;
+      adminSocket = io('http://localhost:5000');
+      adminSocket.on('connect', () => adminSocket.emit('join-admin'));
+      adminSocket.on('new-activity', (data) => {
+        if (!data.createdAt) data.createdAt = new Date().toISOString();
+        addAdminActivity(data);
+        updateAdminStatsOnActivity(data);
+      });
+    }
+
+    async function fetchAdminData() {
+      try {
+        const [usersRes, activitiesRes, moodsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/users/admin/all-users`),
+          fetch(`${API_BASE_URL}/users/admin/all-activities`),
+          fetch(`${API_BASE_URL}/users/admin/all-moods`)
+        ]);
+
+        const [userData, activityData, moodData] = await Promise.all([usersRes.json(), activitiesRes.json(), moodsRes.json()]);
+
+        if (userData.success) {
+          adminUsersCache = userData.users;
+          renderEmployeeDirectory();
+
+          // Populate Performance Select
+          const perfSelect = document.getElementById('performanceEmployeeSelect');
+          if (perfSelect) {
+            perfSelect.innerHTML = '<option value="all">Global Aggregate (All Staff)</option>';
+            userData.users.filter(u => u.role !== 'Admin').forEach(emp => {
+              const opt = document.createElement('option');
+              opt.value = emp._id || emp.id;
+              opt.textContent = emp.displayName || 'Unknown';
+              perfSelect.appendChild(opt);
+            });
+          }
+
+          adminStatsState.totalUsers = userData.users.length;
+          adminStatsState.totalEmployees = userData.users.filter(u => u.role !== 'Admin').length;
+
+          document.getElementById('admin-stat-total-users').textContent = adminStatsState.totalUsers;
+          document.getElementById('admin-stat-total-employees').textContent = adminStatsState.totalEmployees;
+          document.getElementById('admin-userCountText').textContent = adminStatsState.totalEmployees;
+
+          adminStatsState.totalTasks = userData.users.reduce((sum, u) => sum + (u.tasksCompleted || 0), 0);
+          document.getElementById('admin-stat-total-tasks').textContent = adminStatsState.totalTasks;
+        }
+
+        // Use historical mood data from the Mood collection
+        if (moodData.success && moodData.moodCounts) {
+          adminStatsState.moodCounts = {
+            happy: moodData.moodCounts.happy || 0,
+            neutral: moodData.moodCounts.neutral || 0,
+            stressed: moodData.moodCounts.stressed || 0,
+            angry: moodData.moodCounts.angry || 0,
+            relieved: moodData.moodCounts.relieved || 0
+          };
+          updateAdminMoodChart();
+        }
+
+        if (activityData.success) {
+          adminActivitiesCache = activityData.activities;
+          const feed = document.getElementById('admin-activity-feed');
+          feed.innerHTML = '';
+          activityData.activities.forEach(act => addAdminActivity(act, false));
+
+          // Initialize Performance Chart
+          if (window.updatePerformanceChart) window.updatePerformanceChart();
+        }
+      } catch (err) { console.error('Admin data fetch failed', err); }
+    }
+
+    function addAdminActivity(data, isNew = true) {
+      const feed = document.getElementById('admin-activity-feed');
+      if (!feed) return;
+      if (feed.querySelector('.italic')) feed.innerHTML = '';
+
+      const item = document.createElement('div');
+      item.className = `activity-row flex items-start gap-4 p-4 rounded-3xl transition-all ${isNew ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-slate-50'}`;
+
+      const type = data.type || 'system';
+      let icon = '🔔';
+      let iconBg = 'bg-slate-100 text-slate-500';
+      if (type === 'mood') { icon = '🎭'; iconBg = 'bg-pink-100 text-pink-600'; }
+      if (type === 'task') { icon = '✅'; iconBg = 'bg-cyan-100 text-cyan-600'; }
+      if (type === 'wellness') { icon = '🧘'; iconBg = 'bg-purple-100 text-purple-600'; }
+
+      item.innerHTML = `
+        <div class="w-10 h-10 rounded-xl ${iconBg} flex-shrink-0 flex items-center justify-center text-lg shadow-sm">${icon}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex justify-between items-start mb-0.5">
+            <h4 class="font-bold text-slate-800 text-sm truncate hover:text-indigo-600 cursor-pointer" onclick="viewEmployeeDetails('${data.userId}')">${data.userDisplayName || 'User'}</h4>
+            <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">${data.time || 'now'}</span>
+          </div>
+          <p class="text-xs text-slate-500 line-clamp-1">${data.activity}</p>
+        </div>
+      `;
+      if (isNew) {
+        if (isNew && data.userId) {
+          // Update cache for any single activity so drill-down stays fresh
+          adminActivitiesCache.unshift(data);
+        }
+        feed.prepend(item); playSound('notify');
+      } else { feed.appendChild(item); }
+    }
+
+    function updateAdminStatsOnActivity(data) {
+      if (data.type === 'mood' && data.mood) {
+        if (adminStatsState.moodCounts[data.mood] !== undefined) {
+          adminStatsState.moodCounts[data.mood]++;
+          updateAdminMoodChart();
+        }
+        // Sync user card
+        const user = adminUsersCache.find(u => (u._id || u.id) === data.userId);
+        if (user) {
+          user.currentMood = data.mood;
+          renderEmployeeDirectory(document.getElementById('admin-user-search')?.value || '');
+        }
+      }
+      if (data.type === 'task') {
+        adminStatsState.totalTasks++;
+        const statEl = document.getElementById('admin-stat-total-tasks');
+        if (statEl) statEl.textContent = adminStatsState.totalTasks;
+
+        // Sync user card productivity count
+        const user = adminUsersCache.find(u => (u._id || u.id) === data.userId);
+        if (user) {
+          user.tasksCompleted = (user.tasksCompleted || 0) + 1;
+          renderEmployeeDirectory(document.getElementById('admin-user-search')?.value || '');
+        }
+        if (window.updatePerformanceChart) window.updatePerformanceChart();
+      }
+      if (data.type === 'work') {
+        // Sync current project field
+        const user = adminUsersCache.find(u => (u._id || u.id) === data.userId);
+        if (user) {
+          // Extract project name from activity description "Working on: X, Y"
+          if (data.activity && data.activity.startsWith('Working on: ')) {
+            user.currentProject = data.activity.replace('Working on: ', '');
+            renderEmployeeDirectory(document.getElementById('admin-user-search')?.value || '');
+          }
+        }
+      }
+      if (data.type === 'profile' && data.activity.includes('New user joined')) {
+        adminStatsState.totalUsers++;
+        document.getElementById('admin-stat-total-users').textContent = adminStatsState.totalUsers;
+
+        if (!data.activity.includes('joined as Admin')) {
+          adminStatsState.totalEmployees++;
+          document.getElementById('admin-stat-total-employees').textContent = adminStatsState.totalEmployees;
+          document.getElementById('admin-userCountText').textContent = adminStatsState.totalEmployees;
+
+          // Refresh directory to show new staff member
+          setTimeout(() => fetchAdminData(), 1000);
+        }
+      }
+    }
+
+    function updateAdminMoodChart() {
+      const labels = ['happy', 'neutral', 'stressed', 'angry', 'relieved'];
+      const data = labels.map(l => adminStatsState.moodCounts[l]);
+
+      if (unifiedAdminChart) {
+        unifiedAdminChart.data.datasets[0].data = data;
+        unifiedAdminChart.update();
+      } else {
+        const ctx = document.getElementById('adminMoodChartUnified')?.getContext('2d');
+        if (!ctx) return;
+        unifiedAdminChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+            datasets: [{
+              data: data,
+              backgroundColor: ['#10B981', '#94A3B8', '#EC4899', '#EF4444', '#F59E0B'],
+              borderWidth: 0,
+              hoverOffset: 10
+            }]
+          },
+          options: { plugins: { legend: { display: false } }, cutout: '70%', responsive: true, maintainAspectRatio: false }
+        });
+      }
+
+      const dominantMood = labels.reduce((a, b) => adminStatsState.moodCounts[a] > adminStatsState.moodCounts[b] ? a : b);
+      const vibeEl = document.getElementById('admin-stat-avg-mood');
+      if (vibeEl) {
+        vibeEl.textContent = dominantMood.charAt(0).toUpperCase() + dominantMood.slice(1);
+        const colors = { happy: 'text-emerald-500', neutral: 'text-slate-500', stressed: 'text-pink-500', angry: 'text-red-500', relieved: 'text-amber-500' };
+        vibeEl.className = `text-3xl font-black ${colors[dominantMood] || 'text-slate-500'}`;
+      }
+
+      // Update labels
+      const container = document.getElementById('admin-mood-labels');
+      if (container) {
+        container.innerHTML = `
+          <div class="flex justify-between items-center p-3 bg-emerald-50 rounded-2xl border border-emerald-100/50">
+            <span class="text-emerald-700 font-bold text-xs flex items-center gap-2">😊 Happy</span>
+            <span class="font-black text-emerald-800 text-sm">${adminStatsState.moodCounts.happy}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-200/50">
+            <span class="text-slate-600 font-bold text-xs flex items-center gap-2">😐 Neutral</span>
+            <span class="font-black text-slate-800 text-sm">${adminStatsState.moodCounts.neutral}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-pink-50 rounded-2xl border border-pink-100/50">
+            <span class="text-pink-700 font-bold text-xs flex items-center gap-2">😩 Stressed</span>
+            <span class="font-black text-pink-800 text-sm">${adminStatsState.moodCounts.stressed}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-red-50 rounded-2xl border border-red-100/50">
+            <span class="text-red-700 font-bold text-xs flex items-center gap-2">😠 Angry</span>
+            <span class="font-black text-red-800 text-sm">${adminStatsState.moodCounts.angry}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-amber-50 rounded-2xl border border-amber-100/50">
+            <span class="text-amber-700 font-bold text-xs flex items-center gap-2">😅 Relieved</span>
+            <span class="font-black text-amber-800 text-sm">${adminStatsState.moodCounts.relieved}</span>
+          </div>
+        `;
+      }
+    }
+
+    window.updatePerformanceChart = async () => {
+      const selectedUserId = document.getElementById('performanceEmployeeSelect')?.value || 'all';
+      const ctx = document.getElementById('adminPerformanceChart')?.getContext('2d');
+      if (!ctx) return;
+
+      const days = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().split('T')[0]);
+      }
+
+      const taskCounts = {};
+      days.forEach(d => taskCounts[d] = 0);
+
+      let relevantActivities = [];
+      if (selectedUserId === 'all') {
+        relevantActivities = adminActivitiesCache.filter(a => a.type === 'task');
+      } else {
+        try {
+          const res = await fetch(`${API_BASE_URL}/users/${selectedUserId}/dashboard`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('empathos_token')}` }
+          });
+          const data = await res.json();
+          relevantActivities = (data.success && data.activities) ? data.activities.filter(a => a.type === 'task') : adminActivitiesCache.filter(a => a.type === 'task' && a.userId === selectedUserId);
+        } catch (e) {
+          relevantActivities = adminActivitiesCache.filter(a => a.type === 'task' && a.userId === selectedUserId);
+        }
+      }
+
+      relevantActivities.forEach(act => {
+        const dateStr = new Date(act.createdAt || Date.now()).toISOString().split('T')[0];
+        if (taskCounts[dateStr] !== undefined) taskCounts[dateStr]++;
+      });
+
+      const chartData = {
+        labels: days.map(d => {
+          const date = new Date(d);
+          return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }),
+        datasets: [{
+          label: selectedUserId === 'all' ? 'Organization Output' : 'Employee Performance',
+          data: Object.values(taskCounts),
+          borderColor: '#0EA5E9',
+          backgroundColor: 'rgba(14, 165, 233, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#0EA5E9',
+          pointRadius: 6,
+          pointHoverRadius: 8
+        }]
+      };
+
+      if (unifiedPerformanceChart) {
+        unifiedPerformanceChart.data = chartData;
+        unifiedPerformanceChart.update();
+      } else {
+        unifiedPerformanceChart = new Chart(ctx, {
+          type: 'line',
+          data: chartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                titleFont: { size: 13, weight: 'bold' },
+                padding: 12,
+                cornerRadius: 12,
+                displayColors: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0,0,0,0.05)' },
+                ticks: { stepSize: 1, font: { weight: 'bold' }, color: '#64748b' }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { font: { weight: 'bold' }, color: '#64748b' }
+              }
+            }
+          }
+        });
+      }
+    };
+
+    window.clearAdminFeed = () => {
+      document.getElementById('admin-activity-feed').innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 italic">Feed cleared. Waiting for activity...</div>';
+    };
+
+    function renderEmployeeDirectory(filter = '') {
+      const list = document.getElementById('admin-employee-list');
+      if (!list) return;
+      list.innerHTML = '';
+
+      const employees = adminUsersCache.filter(u => u.role !== 'Admin' && u.displayName.toLowerCase().includes(filter.toLowerCase()));
+
+      if (employees.length === 0) {
+        list.innerHTML = '<div class="col-span-full py-8 text-center text-slate-400 italic">No employees found matching search.</div>';
+        return;
+      }
+
+      employees.forEach(emp => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 border border-slate-100 p-4 rounded-2xl hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between';
+        card.onclick = () => viewEmployeeDetails(emp._id || emp.id);
+
+        const initial = emp.displayName ? emp.displayName.charAt(0).toUpperCase() : 'U';
+        const moodEmoji = { happy: '😊', neutral: '😐', stressed: '😩', angry: '😡', relieved: '😌' }[emp.currentMood] || '👤';
+
+        // Show current project if available
+        const projectInfo = emp.currentProject
+          ? `<p class="text-[9px] font-bold text-indigo-400 mt-1 truncate">🚧 Working on: ${emp.currentProject}</p>`
+          : '<p class="text-[9px] font-bold text-slate-300 mt-1 uppercase tracking-tight">Idle</p>';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-4 mb-2">
+              <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-xl font-bold text-indigo-500 group-hover:scale-110 transition-transform">${initial}</div>
+              <div class="flex-1 min-w-0">
+                <h4 class="font-bold text-slate-800 truncate">${emp.displayName}</h4>
+                <p class="text-xs text-slate-400 font-medium truncate">${emp.jobTitle || 'Staff Member'}</p>
+              </div>
+              <div class="text-xl">${moodEmoji}</div>
+            </div>
+            ${projectInfo}
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between text-[10px] font-bold text-slate-400 tracking-wider">
+            <span>MOOD: <span class="text-slate-600 uppercase font-extrabold">${emp.currentMood || 'Not Set'}</span></span>
+            <span>TODAY: <span class="text-indigo-600 font-extrabold">${emp.tasksCompleted || 0}</span></span>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    window.filterEmployees = () => {
+      const search = document.getElementById('admin-user-search').value;
+      renderEmployeeDirectory(search);
+    };
+
+    window.viewEmployeeDetails = async function (userId) {
+      if (!userId) return;
+      const user = adminUsersCache.find(u => (u._id || u.id) === userId);
+      if (!user) return;
+
+      // Fetch deep history for modal to ensure "past data" is present
+      let userActivities = [];
+      try {
+        const res = await fetch(`${API_BASE_URL}/users/${userId}/dashboard`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('empathos_token')}` }
+        });
+        const data = await res.json();
+        userActivities = (data.success && data.activities) ? data.activities : adminActivitiesCache.filter(act => act.userId === userId);
+      } catch (e) {
+        userActivities = adminActivitiesCache.filter(act => act.userId === userId);
+      }
+
+      const moods = userActivities.filter(a => a.type === 'mood');
+      const tasks = userActivities.filter(a => a.type === 'task');
+      const systems = userActivities.filter(a => a.type === 'system' || a.type === 'auth' || (a.activity && (a.activity.includes('logged in') || a.activity.includes('joined'))));
+
+      const html = `
+        <div class="p-6 md:p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center sm:items-start gap-4">
+          <div class="flex flex-col sm:flex-row gap-4 md:gap-8 items-center text-center sm:text-left">
+            <div class="w-20 h-20 bg-white rounded-[2rem] shadow-xl flex items-center justify-center text-3xl font-black text-indigo-600 ring-8 ring-white/50">${user.displayName.charAt(0)}</div>
+            <div>
+              <h2 class="text-2xl md:text-3xl font-black text-slate-900">${user.displayName}</h2>
+              <p class="text-indigo-500 font-bold text-base mb-1">${user.jobTitle || 'Staff Member'}</p>
+              <div class="flex flex-wrap justify-center sm:justify-start gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                <span class="bg-indigo-50 px-2 py-0.5 rounded text-indigo-400">ID: ${user.customId || user._id || user.id}</span>
+                <span class="bg-slate-100 px-2 py-0.5 rounded">${user.email || user.username}</span>
+              </div>
+            </div>
+            <button onclick="openEditEmployeeModal('${user._id || user.id}')" class="ml-auto flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-xl hover:bg-indigo-600 hover:text-white transition-all text-xs uppercase tracking-widest shadow-sm border border-slate-300 hover:border-indigo-500">
+               <span class="w-4 h-4" data-lucide="edit-3"></span>
+               Edit Profile
+            </button>
+          </div>
+          <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center bg-white text-slate-400 font-bold rounded-2xl hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100">✕</button>
+        </div>
+        
+        <div class="flex-1 overflow-auto p-6 md:p-10 custom-scrollbar bg-white">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-8 mb-10">
+             <div class="p-6 bg-pink-50 rounded-[2rem] border border-pink-100/30 shadow-sm flex flex-col justify-center">
+                <p class="text-[10px] font-black text-pink-400 uppercase mb-2 tracking-widest">Live Status</p>
+                <h4 class="text-2xl font-black text-pink-600 uppercase tracking-tight">${user.currentMood || 'Unknown'}</h4>
+             </div>
+             <div class="p-6 bg-cyan-50 rounded-[2rem] border border-cyan-100/30 shadow-sm flex flex-col justify-center">
+                <p class="text-[10px] font-black text-cyan-400 uppercase mb-2 tracking-widest">Productivity</p>
+                <h4 class="text-2xl font-black text-cyan-600 uppercase tracking-tight">${user.tasksCompleted || 0} Tasks Today</h4>
+             </div>
+             <div class="p-6 bg-slate-50 rounded-[2rem] border border-slate-200/30 shadow-sm flex flex-col justify-center">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Latest Activity</p>
+                <h4 class="text-sm font-bold text-slate-600 leading-tight line-clamp-2">${userActivities.length > 0 ? userActivities[0].activity : 'No history yet'}</h4>
+             </div>
+          </div>
+
+          <div class="space-y-8 md:space-y-12">
+            <section>
+              <h3 class="text-xs font-black text-slate-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                <span class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+                Employee Activity Audit
+              </h3>
+              
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Performance Line Chart -->
+                <div class="bg-slate-50 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 border border-slate-100 flex flex-col lg:col-span-2">
+                   <div class="flex justify-between items-center mb-6">
+                      <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">📈 Performance Trajectory</h4>
+                      <span class="bg-white px-2 py-1 rounded-lg text-[10px] font-black text-indigo-500 border border-slate-100">Last 7 Days</span>
+                   </div>
+                   <div class="h-48 md:h-64">
+                      <canvas id="employeeDetailChart"></canvas>
+                   </div>
+                </div>
+
+                <!-- Mood History -->
+                <div class="bg-slate-50 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 border border-slate-100 flex flex-col">
+                  <div class="flex justify-between items-center mb-6">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">🎭 Emotional Pulse</h4>
+                    <span class="bg-white px-2 py-1 rounded-lg text-[10px] font-black text-indigo-500 border border-slate-100">${moods.length} Logs</span>
+                  </div>
+                  <div class="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    ${moods.slice(0, 10).map(m => `
+                      <div class="flex justify-between items-center text-xs p-4 bg-white rounded-2xl shadow-sm border border-slate-100 transition-hover hover:border-indigo-200">
+                        <span class="font-bold text-slate-700 capitalize">${m.mood || 'logged'}</span>
+                        <span class="text-[10px] font-black text-slate-400">${m.time || 'recent'}</span>
+                      </div>
+                    `).join('') || '<p class="text-xs text-slate-400 italic py-4">No mood history available.</p>'}
+                  </div>
+                </div>
+
+                <!-- Task Activity -->
+                <div class="bg-slate-50 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 border border-slate-100 flex flex-col">
+                  <div class="flex justify-between items-center mb-6">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">✅ Performance Trail</h4>
+                    <span class="bg-white px-2 py-1 rounded-lg text-[10px] font-black text-cyan-500 border border-slate-100">${tasks.length} Updates</span>
+                  </div>
+                  <div class="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    ${tasks.slice(0, 10).map(t => `
+                      <div class="flex items-start gap-3 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-cyan-200">
+                        <div class="w-6 h-6 bg-cyan-50 text-cyan-600 rounded-lg flex items-center justify-center text-[10px]">✔</div>
+                        <div class="flex-1">
+                          <p class="text-xs font-bold text-slate-800 leading-tight">${t.activity}</p>
+                          <p class="text-[9px] font-black text-slate-300 mt-1 uppercase">${t.time || 'now'}</p>
+                        </div>
+                      </div>
+                    `).join('') || '<p class="text-xs text-slate-400 italic py-4">No task activity detected.</p>'}
+                  </div>
+                </div>
+
+                <!-- System & Logins -->
+                <div class="bg-indigo-900 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 lg:col-span-2 text-white/90">
+                   <h4 class="text-xs font-black text-indigo-300 uppercase mb-6 tracking-widest">💻 Core System Audit (Logins & Sessions)</h4>
+                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     ${systems.slice(0, 8).map(s => `
+                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                           <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg">⚡</div>
+                           <div class="flex-1">
+                              <p class="text-xs font-bold text-white">${s.activity}</p>
+                              <p class="text-[9px] font-black text-white/40 mt-1 uppercase">${s.time || 'now'}</p>
+                           </div>
+                        </div>
+                     `).join('') || '<p class="text-xs text-indigo-400 italic col-span-2 text-center py-4">No system auth logs discovered.</p>'}
+                   </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      `;
+      openModal(html, true);
+
+      // Render performance chart in modal
+      setTimeout(() => {
+        const dCtx = document.getElementById('employeeDetailChart')?.getContext('2d');
+        if (!dCtx) return;
+
+        const detailDays = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          detailDays.push(d.toISOString().split('T')[0]);
+        }
+
+        const detailCounts = {};
+        detailDays.forEach(d => detailCounts[d] = 0);
+        tasks.forEach(t => {
+          const dStr = new Date(t.createdAt || Date.now()).toISOString().split('T')[0];
+          if (detailCounts[dStr] !== undefined) detailCounts[dStr]++;
+        });
+
+        new Chart(dCtx, {
+          type: 'line',
+          data: {
+            labels: detailDays.map(d => new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })),
+            datasets: [{
+              data: Object.values(detailCounts),
+              borderColor: '#6366F1',
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+              fill: true,
+              tension: 0.4,
+              borderWidth: 3,
+              pointRadius: 4,
+              pointHoverRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.02)' }, ticks: { stepSize: 1, color: '#94A3B8' } },
+              x: { grid: { display: false }, ticks: { color: '#94A3B8' } }
+            }
+          }
+        });
+      }, 300);
+    };
+
+    window.openEditEmployeeModal = async (userId) => {
+      closeModal(); // Close detail modal first
+      const user = adminUsersCache.find(u => (u._id || u.id) === userId);
+      if (!user) return;
+
+      openModal(`
+            <div class="bg-white">
+                <div class="bg-indigo-600 px-8 py-6 flex justify-between items-center text-white">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                            <span data-lucide="user-cog" class="w-6 h-6 text-white"></span>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-black tracking-tight uppercase">Edit Employee</h3>
+                            <p class="text-indigo-200 text-xs font-bold uppercase tracking-widest pl-0.5">Update system credentials</p>
+                        </div>
+                    </div>
+                    <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors">
+                        <span data-lucide="x" class="w-6 h-6 text-white"></span>
+                    </button>
+                </div>
+                
+                <div class="p-8 space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Full Name</label>
+                        <input id="editEmpName" type="text" value="${user.displayName}" 
+                            class="w-full px-6 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700 transition" />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Email Address</label>
+                            <input id="editEmpEmail" type="email" value="${user.email || user.username}" 
+                                class="w-full px-6 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700 transition" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">System Role</label>
+                            <select id="editEmpRole" class="w-full px-6 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700 transition cursor-pointer">
+                                <option value="Employee" ${user.role === 'Employee' ? 'selected' : ''}>Employee</option>
+                                <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-4 border-t border-slate-100">
+                        <label class="text-[10px] font-black text-pink-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                            <span data-lucide="lock" class="w-3 h-3"></span> Reset Password
+                        </label>
+                        <input id="editEmpPassword" type="password" placeholder="Enter new password to reset..." 
+                            class="w-full px-6 py-3 bg-pink-50/20 border-2 border-pink-100 rounded-xl focus:border-pink-500 focus:bg-white outline-none font-bold text-slate-700 placeholder:text-pink-300 transition" />
+                        <p class="text-[10px] text-slate-400 font-medium ml-1">Leave blank to keep current password unchanged.</p>
+                    </div>
+
+                    <div class="pt-6 flex justify-end gap-4">
+                        <button onclick="closeModal()" class="px-6 py-3 rounded-xl border-2 border-slate-100 text-slate-500 font-bold hover:bg-slate-50 transition">Cancel</button>
+                        <button onclick="saveEmployeeChanges('${user._id || user.id}')" 
+                            class="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 transition-all">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+      lucide.createIcons();
+    };
+
+    window.saveEmployeeChanges = async (userId) => {
+      const displayName = document.getElementById('editEmpName').value;
+      const email = document.getElementById('editEmpEmail').value;
+      const role = document.getElementById('editEmpRole').value;
+      const password = document.getElementById('editEmpPassword').value;
+
+      console.log(`Attempting to update user ${userId}`, { displayName, email, role, passwordLength: password.length });
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayName, email, role, password })
+        });
+
+        console.log('Update response status:', res.status);
+        const data = await res.json();
+        console.log('Update response data:', data);
+
+        if (data.success) {
+          // Update local cache
+          const idx = adminUsersCache.findIndex(u => (u._id || u.id) === userId);
+          if (idx !== -1) {
+            adminUsersCache[idx] = { ...adminUsersCache[idx], ...data.user };
+          }
+          closeModal();
+          renderEmployeeDirectory(document.getElementById('admin-user-search')?.value || '');
+          alert('✅ Employee profile updated successfully.');
+        } else {
+          console.error('Update failed:', data.error);
+          alert(`❌ Update Failed: ${data.error || 'Unknown server error'}`);
+        }
+      } catch (e) {
+        console.error('Update exception:', e);
+        alert(`❌ Network Error: ${e.message}. Check console for details.`);
+      }
+    };
+
+    function performLogout() {
+      const keys = ['empathos_user', 'empathos_token', 'empathos_role', 'em_user', 'em_columns', 'em_moodLog', 'em_mood', 'em_local_id'];
+      keys.forEach(k => localStorage.removeItem(k));
+      toast('Logging out...');
+      setTimeout(() => window.location.href = '2.login.html', 500);
+    }
+
+    // Wire up header logout
+    if (headerLogoutBtn) headerLogoutBtn.addEventListener('click', performLogout);
+
+    // Export logout to global for any onclick handlers
+    window.performLogout = performLogout;
+
+    // Initialize app
+    async function initApp() {
+      // 0. Check connectivity
+      try {
+        const health = await fetch(`${API_BASE_URL}/health`).then(res => res.json());
+        console.log('Backend connected:', health);
+        authStatusEl.textContent = 'Auth: connected (API Live)';
+      } catch (e) {
+        console.error('Backend unreachable:', e);
+        authStatusEl.textContent = 'Auth: server offline';
+        toast('Warning: Backend server is unreachable.', 5000);
+      }
+
+      // 1. Initial render from localStore (immediate UI)
+      renderBoard();
+
+      // 2. Fetch remote data
+      await loadTasks();
+
+      applyTheme(localStore.mood);
+      updateMoodChartFromLog();
+      renderActivityRows();
+
+      // 3. Admin specific init
+      initAdminConsole();
+
+      const role = localStorage.getItem('empathos_role');
+      if (role === 'Admin') {
+        showPage('admin');
+      } else {
+        showPage('dashboard');
+      }
+    }
+
+    // Dropdown Toggle Logic
+    const trigger = document.getElementById('userProfileTrigger');
+    const dropdown = document.getElementById('profileDropdown');
+
+    if (trigger && dropdown) {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!trigger.contains(e.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+    }
+
+    // initApp() is now called from DOMContentLoaded listener above
+
+    // Save on unload
+    window.addEventListener('beforeunload', () => saveLocal());
+  </script>
+</body>
+
+</html>

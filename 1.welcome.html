@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmpathOS | Pink Productivity Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Poppins for modern professionalism -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* Define a calming Pink/Mauve Palette */
+        :root {
+            --primary-bg: #FDF2F8;
+            /* Very Light Pale Pink */
+            --sidebar-bg: #FCE7F3;
+            /* Soft Pink - used for mockup header */
+            --accent-light: #F9A8D4;
+            /* Soft Rose */
+            --accent-dark: #DB2777;
+            /* Vibrant Rose for actions */
+            --card-bg: #FFFFFF;
+            --text-dark: #1F2937;
+            --text-light: #FEE7F5;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-dark);
+        }
+
+        /* Responsive Grid for Main Layout is adjusted for the Hero section */
+        .dashboard-grid {
+            display: flex;
+            /* Change to flex for full screen hero */
+            height: 100vh;
+        }
+
+        /* Utility for quick animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* Custom rotation effect for the mockup */
+        .perspective-\[1000px\] {
+            perspective: 1000px;
+        }
+
+        .rotate-y-3 {
+            transform: rotateY(3deg);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Hero Section: Full Screen with Pink Gradient and Two Columns -->
+    <section class="min-h-screen flex items-center justify-center p-6 lg:p-12 
+                    bg-gradient-to-br from-[color:var(--primary-bg)] to-[color:var(--accent-light)]">
+
+        <div class="container mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-7xl">
+
+            <!-- Left Side: Headline and CTA -->
+            <div class="text-center lg:text-left py-12 lg:py-0 animate-fadeIn">
+                <h1
+                    class="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-tight mb-6 text-[color:var(--text-dark)]">
+                    EmpathOS: <span class="text-[color:var(--accent-dark)]">Where Productivity</span> Meets Well-being
+                </h1>
+
+                <p class="text-lg md:text-xl text-gray-700 mb-10 max-w-xl mx-auto lg:mx-0">
+                    Transform your team's workflow with emotional awareness. Manage tasks, track mood, and foster a
+                    truly supportive work environment in one seamless platform.
+                </p>
+
+                <a href="2.login.html">
+                    <button
+                        class="bg-[color:var(--accent-dark)] text-white font-semibold py-3 px-10 rounded-full shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105 text-lg">
+                        Get Started
+                    </button>
+                </a>
+            </div>
+
+            <!-- Right Side: Dashboard Mockup -->
+            <div class="p-4 lg:p-8 relative transform perspective-[1000px] animate-fadeIn delay-300">
+                <div
+                    class="w-full h-[500px] bg-white rounded-3xl shadow-[0_30px_60px_-15px_rgba(219,39,119,0.3),_0_20px_40px_-10px_rgba(0,0,0,0.1)] 
+                            flex flex-col overflow-hidden border border-pink-100/50 transition duration-500 hover:rotate-y-3 hover:scale-[1.02]">
+
+                    <!-- Mockup Header (Simplified Chat) -->
+                    <div
+                        class="p-3 bg-gradient-to-r from-pink-100 to-purple-100 text-slate-700 flex justify-between items-center border-b border-white/50">
+                        <span class="font-medium text-sm">#project-symphony</span>
+                        <div class="flex space-x-2">
+                            <div class="w-3 h-3 bg-green-400 rounded-full" title="Jane Doe Online"></div>
+                            <div class="w-3 h-3 bg-yellow-400 rounded-full" title="Alex Chen Away"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 grid grid-cols-2 p-4 gap-4 overflow-hidden">
+
+                        <!-- Mockup Panel 1: Mood Tracking -->
+                        <div class="bg-red-50 p-4 rounded-xl flex flex-col justify-between shadow-inner">
+                            <span class="text-sm font-semibold text-gray-700">Mood Tracking</span>
+                            <div class="text-center">
+                                <p class="text-5xl my-2">😌</p>
+                                <p class="text-xs font-medium text-green-700">Team Calm: 62%</p>
+                            </div>
+                            <div class="h-1 bg-green-300 rounded-full"></div>
+                        </div>
+
+                        <!-- Mockup Panel 2: Tasks -->
+                        <div class="bg-blue-50 p-4 rounded-xl shadow-inner">
+                            <span class="text-sm font-semibold text-gray-700">Tasks Due</span>
+                            <ul class="mt-2 space-y-1">
+                                <li
+                                    class="text-xs text-gray-600 truncate p-1 bg-white rounded border-l-2 border-yellow-500">
+                                    Develop API endpoint
+                                </li>
+                                <li
+                                    class="text-xs text-gray-600 truncate p-1 bg-white rounded border-l-2 border-red-500">
+                                    Review UX notes
+                                </li>
+                                <li
+                                    class="text-xs text-gray-600 truncate p-1 bg-white rounded border-l-2 border-green-500">
+                                    Finalize copy
+                                </li>
+                            </ul>
+                            <div
+                                class="mt-3 text-xs text-right text-gray-500 hover:text-[color:var(--accent-dark)] transition">
+                                View All</div>
+                        </div>
+
+                        <!-- Mockup Panel 3: Quick Chat Message -->
+                        <div class="col-span-2 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
+                            <p class="text-sm text-gray-700">
+                                <span class="font-bold text-[color:var(--accent-dark)]">Jane:</span> Great progress
+                                today!
+                            </p>
+                            <svg class="w-5 h-5 text-[color:var(--accent-dark)]" fill="currentColor"
+                                viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM9.5 8.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+
+</html>

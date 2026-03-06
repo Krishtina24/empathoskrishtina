@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmpathOS Login & Signup</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Nunito Font for a friendlier feel -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Load Lucide Icons -->
+    <script type="module" src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom Tailwind Configuration for Soft Pink Theme */
+        tailwind.config= {
+            theme: {
+                extend: {
+                    colors: {
+                        'e-pink-light': '#FFB6C1',
+                            /* Light Pink */
+                            'e-pink-hot': '#FF69B4',
+                            /* Hot Pink */
+                            'e-pink-pale': '#DB7093',
+                            /* Pale Violet Red */
+                            'e-gray-dark': '#4A4A4A',
+                            'e-gray-medium': '#666666',
+                            'e-white-soft': '#F8F9FA',
+                    }
+
+                    ,
+                    fontFamily: {
+                        sans: ['Nunito', 'sans-serif'],
+                    }
+
+                    ,
+                    boxShadow: {
+                        'soft-pink': '0 10px 15px -3px rgba(255, 105, 180, 0.2), 0 4px 6px -2px rgba(255, 105, 180, 0.05)',
+                    }
+
+                    ,
+                }
+            }
+        }
+
+        /* -------------------------------------- */
+        /* Core Aesthetic and Responsiveness CSS */
+        /* -------------------------------------- */
+
+        /* Full-screen pink gradient background (Mobile-First) */
+        .mood-bg {
+            background-image: linear-gradient(135deg, #ea7284, #FFE4E1);
+            transition: all 1s ease;
+        }
+
+        /* Glass Card Effect */
+        .glass-card {
+            background-color: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        /* Inputs and Buttons for Touch-Friendly Design */
+        .input-field {
+            height: 48px;
+            /* Touch target standard */
+            transition: all 0.3s ease;
+        }
+
+        .touch-btn {
+            min-height: 44px;
+            /* Touch target standard */
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Responsive Role Toggle Styles */
+        .role-toggle:checked+.toggle-label {
+            background-color: #FF69B4;
+            /* Hot Pink */
+            color: white;
+            box-shadow: 0 4px 10px rgba(255, 105, 180, 0.4);
+        }
+
+        /* Gentle Shake Animation for Errors */
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            20%,
+            60% {
+                transform: translateX(-5px);
+            }
+
+            40%,
+            80% {
+                transform: translateX(5px);
+            }
+        }
+
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+    </style>
+</head>
+
+<!-- Mobile: Full screen. Desktop: Split screen with imagery on the right. -->
+
+<body
+    class="mood-bg min-h-screen flex flex-col lg:flex-row items-center justify-center p-0 lg:p-0 overflow-hidden font-sans">
+
+    <!-- Desktop Imagery Panel (60% width on desktop, hidden on mobile) -->
+    <div id="desktop-imagery"
+        class="hidden lg:flex lg:w-[60%] h-screen flex-col justify-center items-center p-16 bg-e-pink-pale/90 text-white relative">
+        <div class="absolute inset-0 opacity-20" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjRkZCNkMxIiBkPSJNNDguNywtMy44QzQ4LjcsMTkuMywyNC4zLDM4LjYsMC4zLDM4LjZDLTIzLjcsMzguNiwtNDcuNCwxOS4zLC00Ny40LC0zLjhDLTQ3LjQsLTI2LjksLTIzLjcsLTUzLjgsMC4zLC01My44QzI0LjMsLTUzLjgsNDguNywtMjYuOSw0OC43LC0zLjhaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1MCA1MCkiIC8+PC9zdmc+'); 
+            background-size: cover; 
+            background-repeat: no-repeat;"></div>
+        <div class="z-10 text-center space-y-4">
+            <span data-lucide="heart" class="w-12 h-12 mx-auto text-e-pink-light"></span>
+            <h2 class="text-5xl font-extrabold leading-tight">EmpathOS</h2>
+            <p class="text-2xl font-light tracking-wide italic mt-2">"Where productivity meets well-being"</p>
+            <p class="mt-8 text-2sm opacity-90 max-w-sm">Build an emotionally intelligent, high-performing culture
+                powered by real-time well-being insights.</p>
+        </div>
+    </div>
+
+    <!-- Auth Card (40% width on desktop, 90% on mobile) -->
+    <div id="auth-card"
+        class="w-full h-full lg:h-auto lg:w-[40%] max-w-lg lg:max-w-none p-6 sm:p-10 md:p-12 lg:p-16 glass-card rounded-none lg:rounded-3xl shadow-soft-pink flex flex-col justify-center overflow-y-auto">
+
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <div class="flex items-center justify-center space-x-2 text-e-gray-dark">
+                <span data-lucide="heart" class="w-6 h-6 text-e-pink-hot"></span>
+                <h1 id="main-header" class="text-3xl font-extrabold tracking-tight whitespace-nowrap">Welcome back</h1>
+            </div>
+            <p id="sub-header" class="text-e-gray-medium mt-2 text-sm">Please log in to continue.</p>
+        </header>
+
+        <!-- Dynamic Message Container -->
+        <div id="message-container"
+            class="mb-4 hidden text-center p-3 rounded-xl border text-sm font-semibold transition duration-300"
+            role="alert">
+            <p id="message-text"></p>
+        </div>
+
+        <!-- -------------------------------------- -->
+        <!-- LOGIN FLOW -->
+        <!-- -------------------------------------- -->
+        <div id="login-flow">
+            <form id="login-form" class="space-y-4">
+
+                <!-- 1. Email Input -->
+                <div>
+                    <div
+                        class="relative flex items-center bg-e-white-soft rounded-xl shadow-inner border border-e-gray-medium/20 focus-within:ring-2 focus-within:ring-e-pink-hot/50">
+                        <span data-lucide="mail" class="w-5 h-5 ml-4 text-e-pink-hot absolute opacity-70"></span>
+                        <input type="email" id="login-email" placeholder="Work Email" required
+                            class="input-field w-full bg-transparent pl-12 pr-4 py-3 text-e-gray-dark rounded-xl focus:outline-none placeholder-e-gray-medium/70">
+                    </div>
+                </div>
+
+                <!-- 2. Password Input with Toggle -->
+                <div class="relative">
+                    <div
+                        class="flex items-center bg-e-white-soft rounded-xl shadow-inner border border-e-gray-medium/20 focus-within:ring-2 focus-within:ring-e-pink-hot/50">
+                        <span data-lucide="lock" class="w-5 h-5 ml-4 text-e-pink-hot absolute opacity-70"></span>
+                        <input type="password" id="login-password" placeholder="••••••••" required
+                            class="input-field w-full bg-transparent pl-12 pr-12 py-3 text-e-gray-dark rounded-xl focus:outline-none placeholder-e-gray-medium/70">
+                        <button type="button" id="toggle-login-password"
+                            class="absolute right-0 p-3 text-e-pink-hot/70 hover:text-e-pink-hot rounded-r-xl touch-btn"
+                            aria-label="Toggle password visibility">
+                            <span data-lucide="eye" class="w-5 h-5"></span>
+                        </button>
+                    </div>
+                    <a href="#" id="forgot-password-link"
+                        class="float-right text-xs font-medium text-e-pink-hot hover:text-e-pink-pale transition mt-1">Forgot
+                        Password?</a>
+                </div>
+
+                <!-- 3. Role Selection -->
+                <div class="pt-4">
+                    <label class="block text-e-gray-medium font-semibold text-sm mb-2">Select Your Role</label>
+                    <!-- Mobile: Stacked, Tablet/Desktop: Horizontal flex -->
+                    <div class="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-2">
+                        <input type="radio" id="role-employee-l" name="role-l" value="Employee"
+                            class="hidden role-toggle" checked>
+                        <label for="role-employee-l"
+                            class="toggle-label touch-btn flex-1 text-sm font-semibold px-4 py-2 cursor-pointer rounded-xl border border-e-pink-light text-e-gray-medium text-center hover:bg-e-pink-light/30">
+                            Employee
+                        </label>
+
+                        <input type="radio" id="role-admin-l" name="role-l" value="Admin" class="hidden role-toggle">
+                        <label for="role-admin-l"
+                            class="toggle-label touch-btn flex-1 text-sm font-semibold px-4 py-2 cursor-pointer rounded-xl border border-e-pink-light text-e-gray-medium text-center hover:bg-e-pink-light/30">
+                            Admin
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 4. Login Button -->
+                <button type="submit" id="login-btn"
+                    class="w-full touch-btn rounded-xl font-bold text-white mt-8 transition transform active:scale-95"
+                    style="background-image: linear-gradient(to right, #FF69B4, #DB7093); box-shadow: 0 5px 15px rgba(219, 112, 147, 0.4);">
+                    <span id="login-btn-text" class="text-lg">Log In</span>
+                </button>
+
+                <!-- 5. Signup Alternative -->
+                <p class="text-center text-e-gray-medium pt-4 text-sm">
+                    Don't have an account?
+                    <a href="#" id="show-signup"
+                        class="font-bold text-e-pink-hot hover:text-e-pink-pale transition duration-200">Sign up
+                        here</a>
+                </p>
+            </form>
+        </div>
+
+        <!-- -------------------------------------- -->
+        <!-- SIGNUP FLOW (Multi-Step) -->
+        <!-- -------------------------------------- -->
+        <div id="signup-flow" class="hidden">
+            <div id="progress-indicator" class="flex justify-center space-x-2 mb-8">
+                <div id="step-1-dot" class="w-3 h-3 rounded-full bg-e-pink-hot transition-colors duration-300"></div>
+                <div id="step-2-dot" class="w-3 h-3 rounded-full bg-e-pink-light transition-colors duration-300"></div>
+                <div id="step-3-dot" class="w-3 h-3 rounded-full bg-e-pink-light transition-colors duration-300"></div>
+            </div>
+
+            <!-- STEP 1: Auth -->
+            <form id="signup-step-1" class="space-y-4">
+                <p class="text-center text-e-gray-medium mb-6">Step 1 of 3: Set up your credentials</p>
+                <!-- Email Input -->
+                <div>
+                    <div
+                        class="relative flex items-center bg-e-white-soft rounded-xl shadow-inner border border-e-gray-medium/20 focus-within:ring-2 focus-within:ring-e-pink-hot/50">
+                        <span data-lucide="mail" class="w-5 h-5 ml-4 text-e-pink-hot absolute opacity-70"></span>
+                        <input type="email" id="signup-email" placeholder="Work Email" required
+                            class="input-field w-full bg-transparent pl-12 pr-4 py-3 text-e-gray-dark rounded-xl focus:outline-none placeholder-e-gray-medium/70">
+                    </div>
+                </div>
+                <!-- Password Input -->
+                <div class="relative">
+                    <div
+                        class="flex items-center bg-e-white-soft rounded-xl shadow-inner border border-e-gray-medium/20 focus-within:ring-2 focus-within:ring-e-pink-hot/50">
+                        <span data-lucide="lock" class="w-5 h-5 ml-4 text-e-pink-hot absolute opacity-70"></span>
+                        <input type="password" id="signup-password" placeholder="Create Password" required
+                            class="input-field w-full bg-transparent pl-12 pr-12 py-3 text-e-gray-dark rounded-xl focus:outline-none placeholder-e-gray-medium/70">
+                        <button type="button" id="toggle-signup-password"
+                            class="absolute right-0 p-3 text-e-pink-hot/70 hover:text-e-pink-hot rounded-r-xl touch-btn"
+                            aria-label="Toggle password visibility">
+                            <span data-lucide="eye" class="w-5 h-5"></span>
+                        </button>
+                    </div>
+                    <!-- Password Strength Indicator -->
+                    <div class="mt-2 w-full bg-e-gray-medium/20 rounded-full overflow-hidden">
+                        <div id="password-strength" class="h-1.5 rounded-full transition-all duration-300"
+                            style="width: 0%; background-color: #DB7093;"></div>
+                    </div>
+                    <p id="strength-text" class="text-xs text-e-gray-medium font-medium mt-1">Password strength: Weak
+                    </p>
+                </div>
+
+                <button type="button" id="next-step-1"
+                    class="w-full touch-btn rounded-xl font-bold text-white mt-8 transition transform active:scale-95"
+                    style="background-image: linear-gradient(to right, #FF69B4, #DB7093); box-shadow: 0 5px 15px rgba(219, 112, 147, 0.4);">
+                    <span id="login-btn-text" class="text-lg">Next: Your Role</span>
+                </button>
+            </form>
+
+            <!-- STEP 2: Details & Role -->
+            <form id="signup-step-2" class="space-y-4 hidden">
+                <p class="text-center text-e-gray-medium mb-6">Step 2 of 3: Tell us about yourself</p>
+                <!-- Name Input -->
+                <div>
+                    <div
+                        class="relative flex items-center bg-e-white-soft rounded-xl shadow-inner border border-e-gray-medium/20 focus-within:ring-2 focus-within:ring-e-pink-hot/50">
+                        <span data-lucide="user" class="w-5 h-5 ml-4 text-e-pink-hot absolute opacity-70"></span>
+                        <input type="text" id="signup-name" placeholder="Full Name" required
+                            class="input-field w-full bg-transparent pl-12 pr-4 py-3 text-e-gray-dark rounded-xl focus:outline-none placeholder-e-gray-medium/70">
+                    </div>
+                </div>
+
+                <!-- Role Selection (Responsive) -->
+                <div class="pt-2">
+                    <label class="block text-e-gray-medium font-semibold text-sm mb-2">I am signing up as...</label>
+                    <!-- Mobile: Vertical Stack (default), Tablet/Desktop: Grid/Horizontal -->
+                    <div id="role-selection-signup" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <!-- Employee Role -->
+                        <input type="radio" id="role-employee-s" name="role-s" value="Employee"
+                            class="hidden role-toggle" checked>
+                        <label for="role-employee-s"
+                            class="toggle-label touch-btn px-4 py-3 cursor-pointer rounded-xl border border-e-pink-light text-e-gray-dark hover:bg-e-pink-light/30 flex items-start space-x-3">
+                            <span data-lucide="user-check" class="w-5 h-5 text-e-pink-hot flex-shrink-0 mt-0.5"></span>
+                            <div>
+                                <span class="font-semibold block">Employee</span>
+                                <span class="text-xs text-e-gray-medium">Track mood & productivity 👨‍💼</span>
+                            </div>
+                        </label>
+
+                        <!-- Admin Role (Full width on all screens for simpler design) -->
+                        <input type="radio" id="role-admin-s" name="role-s" value="Admin" class="hidden role-toggle">
+                        <label for="role-admin-s"
+                            class="toggle-label touch-btn px-4 py-3 cursor-pointer rounded-xl border border-e-pink-light text-e-gray-dark hover:bg-e-pink-light/30 flex items-start space-x-3 md:col-span-2">
+                            <span data-lucide="cog" class="w-5 h-5 text-e-pink-hot flex-shrink-0 mt-0.5"></span>
+                            <div>
+                                <span class="font-semibold block">Admin</span>
+                                <span class="text-xs text-e-gray-medium">Manage organization settings 👨‍💻</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex space-x-4 pt-4">
+                    <button type="button" id="prev-step-2"
+                        class="flex-1 touch-btn rounded-xl font-bold text-e-pink-hot border border-e-pink-hot hover:bg-e-pink-light/30 transition">
+                        Back
+                    </button>
+                    <button type="button" id="next-step-2"
+                        class="flex-1 touch-btn rounded-xl font-bold text-black bg-e-pink-hot hover:bg-e-pink-pale transition transform active:scale-95">
+                        Next: Preferences
+                    </button>
+                </div>
+            </form>
+
+            <!-- STEP 3: Preferences -->
+            <form id="signup-step-3" class="space-y-4 hidden">
+                <p class="text-center text-e-gray-medium mb-6">Step 3 of 3: Finalize your preferences</p>
+
+                <div class="space-y-4 p-4 border border-e-pink-light rounded-xl bg-e-white-soft">
+                    <!-- Preference 1 -->
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" checked class="e-checkbox hidden">
+                        <div
+                            class="w-5 h-5 rounded-md border-2 border-e-pink-pale transition duration-200 flex items-center justify-center role-toggle-visual">
+                            <span data-lucide="check"
+                                class="w-4 h-4 text-white opacity-0 transform scale-50 transition duration-200"></span>
+                        </div>
+                        <span class="text-e-gray-dark">Enable Focus Time reminders (25 min blocks)</span>
+                    </label>
+
+                    <!-- Preference 2 -->
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" checked class="e-checkbox hidden">
+                        <div
+                            class="w-5 h-5 rounded-md border-2 border-e-pink-pale transition duration-200 flex items-center justify-center role-toggle-visual">
+                            <span data-lucide="check"
+                                class="w-4 h-4 text-white opacity-0 transform scale-50 transition duration-200"></span>
+                        </div>
+                        <span class="text-e-gray-dark">Receive weekly well-being reports</span>
+                    </label>
+
+                    <!-- Terms Agreement -->
+                    <label class="flex items-center space-x-3 pt-4 cursor-pointer">
+                        <input id="agree-terms" name="agree-terms" type="checkbox" class="e-checkbox hidden">
+                        <div
+                            class="w-5 h-5 rounded-md border-2 border-e-pink-pale transition duration-200 flex items-center justify-center role-toggle-visual">
+                            <span data-lucide="check"
+                                class="w-4 h-4 text-white opacity-0 transform scale-50 transition duration-200"></span>
+                        </div>
+                        <span class="text-e-gray-medium text-sm">I agree to the <a href="#" id="view-terms"
+                                class="font-medium text-e-pink-hot hover:underline">Terms & Privacy Policy</a></span>
+                    </label>
+                </div>
+
+                <!-- Custom Modal for Terms & Error -->
+                <div id="modal-container" class="modal-overlay">
+                    <div class="modal-content">
+                        <button type="button" id="close-modal"
+                            class="absolute top-4 right-4 text-e-gray-medium hover:text-e-pink-hot transition">
+                            <span data-lucide="x" class="w-6 h-6"></span>
+                        </button>
+                        <div id="modal-body" class="space-y-4">
+                            <!-- Content injected by JS -->
+                        </div>
+                        <div class="mt-6 text-center">
+                            <button type="button" id="modal-ok-btn"
+                                class="px-6 py-2 bg-e-pink-hot text-white font-bold rounded-xl hover:bg-e-pink-pale transition">
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-4 pt-4">
+                    <button type="button" id="prev-step-3"
+                        class="flex-1 touch-btn rounded-xl font-bold text-e-pink-hot border border-e-pink-hot hover:bg-e-pink-light/30 transition">
+                        Back
+                    </button>
+                    <!-- Final Signup Button -->
+                    <button type="submit" id="final-signup-btn"
+                        class="flex-1 touch-btn rounded-xl font-bold text-white transition transform active:scale-95"
+                        style="background-image: linear-gradient(to right, #FF69B4, #DB7093); box-shadow: 0 5px 15px rgba(219, 112, 147, 0.4);">
+                        <span id="signup-btn-text" class="text-lg">Complete Signup</span>
+                    </button>
+                </div>
+
+            </form>
+
+            <!-- Login Prompt -->
+            <p class="text-center text-e-gray-medium pt-8 text-sm">
+                Already have an account?
+                <a href="#" id="show-login"
+                    class="font-bold text-e-pink-hot hover:text-e-pink-pale transition duration-200">Log In</a>
+            </p>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const state = {
+            currentPage: 'login',
+            signupStep: 1,
+            authData: {} // To store data temporarily during signup steps
+        };
+
+        const elements = {
+            authCard: document.getElementById('auth-card'),
+            loginFlow: document.getElementById('login-flow'),
+            signupFlow: document.getElementById('signup-flow'),
+            mainHeader: document.getElementById('main-header'),
+            subHeader: document.getElementById('sub-header'),
+            loginForm: document.getElementById('login-form'),
+            signupStep1: document.getElementById('signup-step-1'),
+            signupStep2: document.getElementById('signup-step-2'),
+            signupStep3: document.getElementById('signup-step-3'),
+            loginPassword: document.getElementById('login-password'),
+            signupPassword: document.getElementById('signup-password'),
+            messageContainer: document.getElementById('message-container'),
+            messageText: document.getElementById('message-text'),
+            strengthBar: document.getElementById('password-strength'),
+            strengthText: document.getElementById('strength-text'),
+            modalContainer: document.getElementById('modal-container'),
+            modalBody: document.getElementById('modal-body'),
+            closeModal: document.getElementById('close-modal'),
+            modalOkBtn: document.getElementById('modal-ok-btn'),
+            viewTerms: document.getElementById('view-terms')
+        };
+
+        // --- Core UI & State Management ---
+
+        function updateHeaders(page) {
+            if (page === 'login') {
+                elements.mainHeader.textContent = 'Welcome back';
+                elements.subHeader.textContent = 'Please log in to continue.';
+            } else {
+                elements.mainHeader.textContent = 'Create your EmpathOS account';
+                elements.subHeader.textContent = 'Begin your journey to well-being.';
+            }
+        }
+
+        function switchAuthMode(mode) {
+            state.currentPage = mode;
+            elements.authCard.classList.remove('animate-shake');
+            elements.loginFlow.classList.toggle('hidden', mode !== 'login');
+            elements.signupFlow.classList.toggle('hidden', mode !== 'signup');
+            elements.messageContainer.classList.add('hidden');
+            updateHeaders(mode);
+
+            if (mode === 'signup') {
+                // Reset signup flow to step 1
+                state.signupStep = 1;
+                updateSignupStep();
+            }
+        }
+
+        function updateSignupStep(step = state.signupStep) {
+            state.signupStep = step;
+
+            // Hide all steps and show only the current one
+            elements.signupStep1.classList.toggle('hidden', step !== 1);
+            elements.signupStep2.classList.toggle('hidden', step !== 2);
+            elements.signupStep3.classList.toggle('hidden', step !== 3);
+
+            // Update progress indicator
+            document.getElementById('step-1-dot').style.backgroundColor = step >= 1 ? '#FF69B4' : '#FFB6C1';
+            document.getElementById('step-2-dot').style.backgroundColor = step >= 2 ? '#FF69B4' : '#FFB6C1';
+            document.getElementById('step-3-dot').style.backgroundColor = step >= 3 ? '#FF69B4' : '#FFB6C1';
+
+            // Update sub-header text
+            elements.subHeader.textContent = `Signup Progress: Step ${step} of 3`;
+
+            // Scroll to top of card to ensure visibility on small screens
+            elements.authCard.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function togglePasswordVisibility(inputElement, toggleButton) {
+            const type = inputElement.type === 'password' ? 'text' : 'password';
+            inputElement.type = type;
+            const iconName = type === 'password' ? 'eye' : 'eye-off';
+            toggleButton.innerHTML = `<span data-lucide="${iconName}" class="w-5 h-5"></span>`;
+            lucide.createIcons(); // Re-render icon
+        }
+
+        // --- Utility Functions ---
+
+        function showMessage(type, message) {
+            elements.messageContainer.classList.remove('hidden', 'border-red-500', 'border-e-pink-hot');
+            elements.messageContainer.classList.remove('bg-red-500/10', 'bg-e-pink-light/30', 'text-red-700', 'text-e-pink-pale');
+
+            if (type === 'error') {
+                elements.messageContainer.classList.add('bg-red-500/10', 'border-red-500/50', 'text-red-700');
+            } else if (type === 'success') {
+                elements.messageContainer.classList.add('bg-e-pink-light/30', 'border-e-pink-hot/50', 'text-e-pink-pale');
+            }
+
+            elements.messageText.textContent = message;
+        }
+
+        function setLoading(btnId, isLoading) {
+            const btn = document.getElementById(btnId);
+            const textSpan = btn.querySelector('span');
+            btn.disabled = isLoading;
+
+            if (isLoading) {
+                btn.style.opacity = 0.9;
+                textSpan.innerHTML = '<span data-lucide="loader" class="w-5 h-5 inline-block animate-spin mr-2"></span> Loading...';
+                lucide.createIcons();
+            } else {
+                btn.style.opacity = 1;
+                textSpan.innerHTML = btnId.includes('login') ? 'Log In' : 'Complete Signup';
+            }
+        }
+
+        function checkPasswordStrength(password) {
+            let score = 0;
+            if (password.length > 8) score++;
+            if (/[A-Z]/.test(password)) score++;
+            if (/[0-9]/.test(password)) score++;
+            if (/[^A-Za-z0-9]/.test(password)) score++;
+
+            let width = (score / 4) * 100;
+            let color = '#DB7093'; // Weak
+            let text = 'Weak';
+
+            if (score === 2) {
+                color = '#FFB6C1'; // Medium
+                text = 'Medium';
+            } else if (score >= 3) {
+                color = '#FF69B4'; // Strong
+                text = 'Strong';
+            }
+
+            elements.strengthBar.style.width = `${width}%`;
+            elements.strengthBar.style.backgroundColor = color;
+            elements.strengthText.textContent = `Password strength: ${text}`;
+        }
+
+        function showModal(title, content) {
+            elements.modalBody.innerHTML = `
+                <h3 class="text-2xl font-bold text-e-gray-dark mb-4">${title}</h3>
+                <div class="text-e-gray-medium text-sm leading-relaxed space-y-3">
+                    ${content}
+                </div>
+            `;
+            elements.modalContainer.classList.add('active');
+            lucide.createIcons();
+        }
+
+        function hideModal() {
+            elements.modalContainer.classList.remove('active');
+        }
+
+        // --- Backend Integration Functions ---
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            // Get selected role
+            const role = document.querySelector('input[name="role-l"]:checked').value;
+
+            setLoading('login-btn', true);
+            elements.authCard.classList.remove('animate-shake');
+            elements.messageContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: email, password: password, role: role })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('success', `Welcome back, ${data.user.displayName}!`);
+
+                    // Store user data
+                    localStorage.setItem('empathos_user', JSON.stringify(data.user));
+                    localStorage.setItem('empathos_token', 'demo-token');
+                    localStorage.setItem('empathos_role', data.user.role || 'Employee');
+
+                    // Redirect to unified dashboard
+                    setTimeout(() => {
+                        window.location.href = '3.dashboardfinal.html';
+                    }, 1500);
+                } else {
+                    showMessage('error', data.error || "Login failed");
+                    elements.authCard.classList.add('animate-shake');
+                }
+            } catch (error) {
+                console.error('Login Error:', error);
+                showMessage('error', "Cannot connect to server. Ensure backend is running.");
+            }
+
+            setLoading('login-btn', false);
+        }
+
+        async function handleFinalSignup(event) {
+            event.preventDefault();
+
+            if (!document.getElementById('agree-terms').checked) {
+                elements.authCard.classList.remove('animate-shake');
+                void elements.authCard.offsetWidth; // Trigger reflow to restart animation
+                elements.authCard.classList.add('animate-shake');
+
+                showModal("Action Required", `
+                    <div class="flex flex-col items-center text-center space-y-4">
+                        <div class="p-3 bg-red-100 rounded-full">
+                            <span data-lucide="alert-circle" class="w-10 h-10 text-red-500"></span>
+                        </div>
+                        <p class="text-lg font-semibold text-e-gray-dark">Agreement Required</p>
+                        <p class="text-e-gray-medium">Please select the checkbox to agree to the Terms and Privacy Policy before proceeding to sign up.</p>
+                    </div>
+                `);
+                return;
+            }
+
+            setLoading('final-signup-btn', true);
+            elements.messageContainer.classList.add('hidden');
+
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const role = document.querySelector('input[name="role-s"]:checked').value;
+
+            if (email && password && name) {
+                try {
+                    const response = await fetch('http://localhost:5000/api/auth/signup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: email,
+                            password: password,
+                            displayName: name,
+                            role: role
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const newId = data.user.customId || 'Pending';
+                        showMessage('success', `Success! Registered as ${newId}. Please log in.`);
+
+                        // Switch to login mode automatically
+                        setTimeout(() => {
+                            switchAuthMode('login');
+                            // Pre-fill email
+                            document.getElementById('login-email').value = email;
+                        }, 2000);
+
+                    } else {
+                        showMessage('error', data.error || "Signup failed");
+                    }
+                } catch (error) {
+                    console.error('Signup Error:', error);
+                    showMessage('error', "Cannot connect to server. Ensure backend is running.");
+                }
+            } else {
+                showMessage('error', "Please fill in all required fields.");
+            }
+
+            setLoading('final-signup-btn', false);
+        }
+
+        // --- Event Handlers ---
+
+        function handleSignupStep1(event) {
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+
+            if (!email || !password) {
+                showMessage('error', "Email and Password are required to continue.");
+                return;
+            }
+
+            // Simple password length validation
+            if (password.length < 8) {
+                showMessage('error', "Password must be at least 8 characters long.");
+                elements.authCard.classList.add('animate-shake');
+                return;
+            }
+
+            state.authData = { email, password };
+            updateSignupStep(2);
+            elements.messageContainer.classList.add('hidden');
+        }
+
+        function handleSignupStep2() {
+            const name = document.getElementById('signup-name').value;
+            const role = document.querySelector('input[name="role-s"]:checked').value;
+
+            if (!name) {
+                showMessage('error', "Please enter your full name.");
+                return;
+            }
+
+            state.authData = { ...state.authData, name, role };
+            updateSignupStep(3);
+            elements.messageContainer.classList.add('hidden');
+        }
+
+        // --- Initialization ---
+
+        function init() {
+            // Set initial mode
+            switchAuthMode('login');
+
+            // Page Switchers
+            document.getElementById('show-signup').addEventListener('click', (e) => { e.preventDefault(); switchAuthMode('signup'); });
+            document.getElementById('show-login').addEventListener('click', (e) => { e.preventDefault(); switchAuthMode('login'); });
+            document.getElementById('forgot-password-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                showMessage('error', "Password reset is restricted. Please contact your administrator.");
+            });
+
+            // Password Toggles
+            document.getElementById('toggle-login-password').addEventListener('click', () => togglePasswordVisibility(elements.loginPassword, document.getElementById('toggle-login-password')));
+            document.getElementById('toggle-signup-password').addEventListener('click', () => togglePasswordVisibility(elements.signupPassword, document.getElementById('toggle-signup-password')));
+
+            // Password Strength Meter
+            elements.signupPassword.addEventListener('input', (e) => checkPasswordStrength(e.target.value));
+
+            // Form Submit Handlers
+            elements.loginForm.addEventListener('submit', handleLogin);
+
+            // Multi-Step Navigation
+            document.getElementById('next-step-1').addEventListener('click', handleSignupStep1);
+            document.getElementById('next-step-2').addEventListener('click', handleSignupStep2);
+            document.getElementById('prev-step-2').addEventListener('click', () => updateSignupStep(1));
+            document.getElementById('prev-step-3').addEventListener('click', () => updateSignupStep(2));
+            elements.signupStep3.addEventListener('submit', handleFinalSignup);
+
+            // Custom Checkbox/Toggle Styling Logic (for the checkmark visibility)
+            document.querySelectorAll('.e-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function () {
+                    const visual = this.nextElementSibling;
+                    const checkIcon = visual.querySelector('span');
+
+                    if (this.checked) {
+                        visual.style.backgroundColor = '#FF69B4';
+                        visual.style.borderColor = '#FF69B4';
+                        checkIcon.style.opacity = 1;
+                        checkIcon.style.transform = 'scale(1)';
+                    } else {
+                        visual.style.backgroundColor = 'transparent';
+                        visual.style.borderColor = '#DB7093';
+                        checkIcon.style.opacity = 0;
+                        checkIcon.style.transform = 'scale(0.5)';
+                    }
+                });
+                // Initialize state for checked boxes
+                if (checkbox.checked) {
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Modal Controls
+            elements.closeModal.addEventListener('click', hideModal);
+            elements.modalOkBtn.addEventListener('click', hideModal);
+            elements.modalContainer.addEventListener('click', (e) => {
+                if (e.target === elements.modalContainer) hideModal();
+            });
+
+            elements.viewTerms.addEventListener('click', (e) => {
+                e.preventDefault();
+                showModal("Terms & Privacy Policy", `
+                    <p><strong>1. Introduction:</strong> Welcome to EmpathOS. We are committed to protecting your personal information and your right to privacy.</p>
+                    <p><strong>2. Data Collection:</strong> We collect mood data, activity logs, and professional information to provide personalized well-being insights.</p>
+                    <p><strong>3. Use of Data:</strong> Your data is used to generate reports for you and your organization, helping to build a better workplace culture.</p>
+                    <p><strong>4. Security:</strong> We implement industry-standard security measures to protect your data.</p>
+                    <p><strong>5. Your Rights:</strong> You have the right to access and delete your data at any time through the dashboard settings.</p>
+                    <p>By using EmpathOS, you agree to these terms.</p>
+                `);
+            });
+
+            // Ensure lucide icons are rendered
+            lucide.createIcons();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+
+</html>

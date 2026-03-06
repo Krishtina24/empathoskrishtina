@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>EmpathOS Admin — Enterprise Insights</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --admin-primary: #db2777;
+            /* Pink 600 */
+            --admin-secondary: #e11d48;
+            /* Rose 600 */
+            --admin-accent: #f43f5e;
+            /* Rose 500 */
+            --bg-dark-slate: #881337;
+            --card-bg: #FFFFFF;
+            --text-dark: #1E293B;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #F8FAFC;
+            color: var(--text-dark);
+            margin: 0;
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .activity-row {
+            animation: slideIn 0.4s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: inherit;
+            border-radius: inherit;
+            animation: pulse 2s infinite;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside
+            class="w-72 bg-gradient-to-b from-[#FFF0F5] via-[#FFE4E1] to-[#FFC0CB] text-pink-900 flex-shrink-0 flex flex-col p-6 border-r border-pink-200">
+            <div class="flex items-center gap-3 mb-10 px-2">
+                <div
+                    class="w-10 h-10 bg-gradient-to-tr from-pink-500 to-rose-400 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-lg ring-2 ring-pink-500/20">
+                    E</div>
+                <span class="text-2xl font-black tracking-tight text-pink-900">Empath<span
+                        class="text-rose-600">OS</span> <span
+                        class="text-[10px] uppercase bg-pink-500/10 text-pink-600 px-2 py-0.5 rounded ml-1 border border-pink-200">Admin</span></span>
+            </div>
+
+            <nav class="flex-1 space-y-2">
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl bg-pink-600 text-white font-semibold transition-all shadow-lg shadow-pink-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    Overview
+                </a>
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-pink-800 hover:bg-white/50 hover:text-pink-600 transition-all hover:shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    User Management
+                </a>
+                <a href="#"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-pink-800 hover:bg-white/50 hover:text-pink-600 transition-all hover:shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Org Insights
+                </a>
+            </nav>
+
+            <div class="pt-6 border-t border-pink-200">
+                <button onclick="performLogout()"
+                    class="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-500 hover:bg-red-50 hover:text-red-600 transition-all font-medium">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Log Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-nav px-8 py-5 flex justify-between items-center z-10">
+                <div>
+                    <h1 class="text-2xl font-bold text-pink-900">Administrator Console</h1>
+                    <p class="text-sm text-pink-700 font-medium">Monitoring activity across <span id="userCountText"
+                            class="text-rose-600 font-bold">...</span> employees</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="connectionStatus"
+                        class="flex items-center gap-2 bg-slate-50 text-slate-400 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-100 transition-all">
+                        <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+                        <span id="connectionText">CHECKING CONNECTION...</span>
+                    </div>
+                    <div
+                        class="h-10 w-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center font-bold text-slate-600">
+                        A</div>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="flex-1 overflow-auto p-8 bg-slate-50/50 custom-scrollbar">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div
+                        class="stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <span
+                                class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">+12%</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Total Users</p>
+                            <h3 id="stat-total-users" class="text-3xl font-black text-slate-800">...</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-600 shadow-inner">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                </svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">AVG</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Team Vibe</p>
+                            <h3 id="stat-avg-mood" class="text-3xl font-black text-pink-500">Neutral</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-card bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center text-cyan-600 shadow-inner">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Tasks Today</p>
+                            <h3 id="stat-total-tasks" class="text-3xl font-black text-cyan-600">...</h3>
+                        </div>
+                    </div>
+
+                    <div
+                        class="stat-card bg-gradient-to-br from-pink-600 to-rose-700 p-6 rounded-3xl shadow-lg border border-pink-700 text-white">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-indigo-200 uppercase tracking-wider mb-1">System Status</p>
+                            <h3 class="text-3xl font-black">All Clear</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Real-time Activity Feed -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div
+                            class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col overflow-hidden">
+                            <div
+                                class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 bg-pink-500 rounded-full"></div>
+                                    <h3 class="text-xl font-bold text-pink-900">Global Activity Feed</h3>
+                                </div>
+                                <button onclick="clearActivityUI()"
+                                    class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">Clear
+                                    Local</button>
+                            </div>
+
+                            <div id="activity-feed"
+                                class="flex-1 min-h-[500px] max-h-[700px] overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                                <!-- Activity items populated here -->
+                                <div class="flex items-center justify-center h-full text-slate-400 italic">
+                                    <div class="text-center">
+                                        <span class="animate-pulse text-4xl mb-2 block">📡</span>
+                                        Connecting to real-time stream...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Quick List & Insights -->
+                    <div class="space-y-8">
+                        <div
+                            class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
+                            <h3 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                                <span
+                                    class="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xs">📊</span>
+                                Mood Distribution
+                            </h3>
+                            <div class="h-64 mb-6">
+                                <canvas id="adminMoodChart"></canvas>
+                            </div>
+                            <div class="space-y-3">
+                                <div
+                                    class="flex justify-between items-center p-3 bg-emerald-50 rounded-2xl border border-emerald-100/50">
+                                    <span class="text-emerald-700 font-bold text-sm flex items-center gap-2">😊
+                                        Happy</span>
+                                    <span id="label-happy" class="font-black text-emerald-800 text-lg">0</span>
+                                </div>
+                                <div
+                                    class="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-200/50">
+                                    <span class="text-slate-600 font-bold text-sm flex items-center gap-2">😐
+                                        Neutral</span>
+                                    <span id="label-neutral" class="font-black text-slate-800 text-lg">0</span>
+                                </div>
+                                <div
+                                    class="flex justify-between items-center p-3 bg-pink-50 rounded-2xl border border-pink-100/50">
+                                    <span class="text-pink-700 font-bold text-sm flex items-center gap-2">😩
+                                        Stressed</span>
+                                    <span id="label-stressed" class="font-black text-pink-800 text-lg">0</span>
+                                </div>
+                                <div
+                                    class="flex justify-between items-center p-3 bg-red-50 rounded-2xl border border-red-100/50">
+                                    <span class="text-red-700 font-bold text-sm flex items-center gap-2">😠
+                                        Angry</span>
+                                    <span id="label-angry" class="font-black text-red-800 text-lg">0</span>
+                                </div>
+                                <div
+                                    class="flex justify-between items-center p-3 bg-amber-50 rounded-2xl border border-amber-100/50">
+                                    <span class="text-amber-700 font-bold text-sm flex items-center gap-2">😅
+                                        Relieved</span>
+                                    <span id="label-relieved" class="font-black text-amber-800 text-lg">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+    </div>
+    </main>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        let socket;
+        let moodChart;
+
+        const stats = {
+            totalUsers: 0,
+            totalTasks: 0,
+            moodCounts: { happy: 0, neutral: 0, stressed: 0, angry: 0, relieved: 0 }
+        };
+
+        // --- Core Logic ---
+
+        function initSocket() {
+            socket = io('http://localhost:5000');
+
+            socket.on('connect', () => {
+                console.log('Connected to socket server');
+                socket.emit('join-admin');
+            });
+
+            socket.on('new-activity', (data) => {
+                addActivityToFeed(data);
+                updateStatsOnActivity(data);
+            });
+        }
+
+        async function fetchInitialData() {
+            try {
+                const [usersRes, activitiesRes, moodsRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/users/admin/all-users`),
+                    fetch(`${API_BASE_URL}/users/admin/all-activities`),
+                    fetch(`${API_BASE_URL}/users/admin/all-moods`)
+                ]);
+
+                const userData = await usersRes.json();
+                const activityData = await activitiesRes.json();
+                const moodData = await moodsRes.json();
+
+                if (userData.success) {
+                    stats.totalUsers = userData.users.length;
+                    document.getElementById('stat-total-users').textContent = stats.totalUsers;
+                    document.getElementById('userCountText').textContent = stats.totalUsers;
+
+                    // Calculate tasks
+                    stats.totalTasks = userData.users.reduce((sum, u) => sum + (u.tasksCompleted || 0), 0);
+                    document.getElementById('stat-total-tasks').textContent = stats.totalTasks;
+                }
+
+                // Use historical mood data from the Mood collection
+                if (moodData.success && moodData.moodCounts) {
+                    stats.moodCounts = {
+                        happy: moodData.moodCounts.happy || 0,
+                        neutral: moodData.moodCounts.neutral || 0,
+                        stressed: moodData.moodCounts.stressed || 0,
+                        angry: moodData.moodCounts.angry || 0,
+                        relieved: moodData.moodCounts.relieved || 0
+                    };
+                }
+                updateMoodChart();
+
+                if (activityData.success) {
+                    const feed = document.getElementById('activity-feed');
+                    feed.innerHTML = ''; // Clear loader
+                    activityData.activities.forEach(act => addActivityToFeed(act, false));
+                }
+            } catch (err) {
+                console.error('Failed to load initial data:', err);
+            }
+        }
+
+
+        function addActivityToFeed(data, isNew = true) {
+            const feed = document.getElementById('activity-feed');
+            if (feed.querySelector('.italic')) feed.innerHTML = ''; // Clear loader if present
+
+            const item = document.createElement('div');
+            item.className = `activity-row flex items-start gap-4 p-4 rounded-3xl transition-all ${isNew ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-slate-50'}`;
+
+            const type = data.type || 'system';
+            let icon = '🔔';
+            let iconBg = 'bg-slate-100 text-slate-500';
+
+            if (type === 'mood') { icon = '🎭'; iconBg = 'bg-pink-100 text-pink-600'; }
+            if (type === 'task') { icon = '✅'; iconBg = 'bg-cyan-100 text-cyan-600'; }
+            if (type === 'work') { icon = '💻'; iconBg = 'bg-indigo-100 text-indigo-600'; }
+            if (type === 'profile') { icon = '👤'; iconBg = 'bg-emerald-100 text-emerald-600'; }
+
+            item.innerHTML = `
+        <div class="w-12 h-12 rounded-2xl ${iconBg} flex-shrink-0 flex items-center justify-center text-xl shadow-sm">
+          ${icon}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex justify-between items-start mb-1">
+            <h4 class="font-bold text-slate-800 truncate">${data.userDisplayName || 'User'}</h4>
+            <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">${data.time || 'now'}</span>
+          </div>
+          <p class="text-sm text-slate-500 line-clamp-2">${data.activity}</p>
+        </div>
+      `;
+
+            if (isNew) {
+                feed.prepend(item);
+                // Play subtle sound if it's a new real-time activity
+                // playNotifySound();
+            } else {
+                feed.appendChild(item);
+            }
+        }
+
+        function updateStatsOnActivity(data) {
+            if (data.type === 'mood' && data.mood) {
+                if (stats.moodCounts[data.mood] !== undefined) {
+                    stats.moodCounts[data.mood]++;
+                    updateMoodChart();
+                }
+            }
+            if (data.type === 'task') {
+                stats.totalTasks++;
+                document.getElementById('stat-total-tasks').textContent = stats.totalTasks;
+            }
+        }
+
+        function updateMoodChart() {
+            const labels = ['happy', 'neutral', 'stressed', 'angry', 'relieved'];
+            const data = labels.map(l => stats.moodCounts[l]);
+
+            if (moodChart) {
+                moodChart.data.datasets[0].data = data;
+                moodChart.update();
+            } else {
+                const ctx = document.getElementById('adminMoodChart').getContext('2d');
+                moodChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+                        datasets: [{
+                            data: data,
+                            backgroundColor: ['#10B981', '#94A3B8', '#EC4899', '#EF4444', '#F59E0B'],
+                            borderWidth: 0,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        cutout: '70%',
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+
+            // Update counters
+            document.getElementById('label-happy').textContent = stats.moodCounts.happy;
+            document.getElementById('label-neutral').textContent = stats.moodCounts.neutral;
+            document.getElementById('label-stressed').textContent = stats.moodCounts.stressed;
+            document.getElementById('label-angry').textContent = stats.moodCounts.angry;
+            document.getElementById('label-relieved').textContent = stats.moodCounts.relieved;
+
+            // Update avg vibe
+            const dominantMood = labels.reduce((a, b) => stats.moodCounts[a] > stats.moodCounts[b] ? a : b);
+            const vibeEl = document.getElementById('stat-avg-mood');
+            vibeEl.textContent = dominantMood.charAt(0).toUpperCase() + dominantMood.slice(1);
+
+            const colors = { happy: 'text-emerald-500', neutral: 'text-slate-500', stressed: 'text-pink-500', angry: 'text-red-500', relieved: 'text-amber-500' };
+            vibeEl.className = `text-3xl font-black ${colors[dominantMood] || 'text-slate-500'}`;
+        }
+
+        function clearActivityUI() {
+            document.getElementById('activity-feed').innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 italic">Feed cleared. Waiting for new activity...</div>';
+        }
+
+        function performLogout() {
+            localStorage.removeItem('empathos_user');
+            localStorage.removeItem('empathos_token');
+            localStorage.removeItem('empathos_role');
+            window.location.href = '2.login.html';
+        }
+
+
+
+        // --- Auth Guard ---
+        function checkAuth() {
+            try {
+                const role = localStorage.getItem('empathos_role');
+                if (role !== 'Admin') {
+                    console.warn("Unauthorized access attempt. Role:", role);
+                    // For debugging, we'll just log instead of forcing redirect if it's missing
+                    if (!role) {
+                        console.error("Storage Access Error: No role found in localStorage. Check browser privacy settings.");
+                        return; // Proceed anyway in debug mode
+                    }
+                    alert('Access Denied. Admins only.');
+                    window.location.href = '2.login.html';
+                }
+            } catch (e) {
+                console.error("CRITICAL: LocalStorage access blocked by browser.", e);
+                alert("WARNING: Your browser's privacy settings are blocking local storage. This app will not function correctly. Please disable 'Shields' or 'Tracking Protection' for this page.");
+            }
+        }
+
+        // Global error handlers for debugging
+        window.onerror = (msg, url, line, col, error) => {
+            console.error("⛔ Global JS Error:", msg, "at", line, ":", col);
+            return false;
+        };
+        window.onunhandledrejection = (event) => {
+            console.error("⛔ Unhandled Promise Rejection:", event.reason);
+        };
+
+        // --- Init ---
+        window.onload = async () => {
+            console.log("🚀 Admin Dashboard initialization sequence started");
+
+            // 1. Connection Health Check
+            try {
+                const health = await fetch(`${API_BASE_URL}/health`);
+                const statusEl = document.getElementById('connectionStatus');
+                const dotEl = document.getElementById('connectionDot');
+                const textEl = document.getElementById('connectionText');
+
+                if (statusEl && dotEl && textEl) {
+                    if (health.ok) {
+                        statusEl.className = "flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-100";
+                        dotEl.className = "pulse-dot";
+                        textEl.textContent = "BACKEND ONLINE";
+                    } else {
+                        statusEl.className = "flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-xs font-bold border border-red-100";
+                        textEl.textContent = "BACKEND ERROR";
+                    }
+                }
+            } catch (e) {
+                console.warn("⚠️ Backend connectivity check failed. Server might be offline.");
+                const statusText = document.getElementById('connectionText');
+                if (statusText) statusText.textContent = "OFFLINE";
+            }
+
+
+
+            // 3. Perform other init tasks with safety
+            try {
+                checkAuth();
+                initSocket();
+                fetchInitialData();
+            } catch (e) {
+                console.error("🛠️ Initialization exception:", e);
+            }
+        };
+    </script>
+</body>
+
+</html>

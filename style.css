@@ -1,0 +1,154 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #FFFBFA; /* soft cream white */
+    background-image: radial-gradient(circle at top left, #FCE7F3 0%, #FFFBFA 60%); /* blush accent fade */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+
+.container-wrapper {
+    background-color: #dfc0e1; /* blush accent */
+    border-radius: 2rem;
+    max-width: 1200px;
+    width: 95%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1); /* softer shadow */
+    display: flex;
+}
+
+.landscape-bg {
+    background-image: url('https://placehold.co/1200x800/ec4899/ffffff?text=LANDSCAPE'); /* pink accent version */
+    background-size: cover;
+    background-position: center;
+    height: 100%;
+    width: 60%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+}
+
+
+.spacer {
+  aspect-ratio: 960/250;
+  width: 100%;
+  height: 55%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.layer1{
+  background-image: url('layer.svg');
+}
+
+
+header {
+    position: absolute;
+    top: -30px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    z-index: 50;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    margin-left: 20px;
+}
+
+.logo {
+    height: 150px;
+}
+
+nav {
+    display: flex;
+    gap: 24px;
+    color: #EC4899; /* soft rose pink for links */
+    font-weight: 600;
+}
+nav a:hover {
+    color: #9D174D; /* deeper pink for hover */
+}
+
+.header-buttons {
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+}
+
+.get-started-button {
+    padding: 8px 24px;
+    border-radius: 9999px;
+    font-weight: 600;
+    color: white;
+    background-color: #EC4899; /* rose pink */
+    transition-duration: 300ms;
+}
+.get-started-button:hover {
+    background-color: #9D174D; /* deeper rose on hover */
+}
+
+.content-section {
+    width: fit-content;
+    height: 600px;
+    position: center;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 64px;
+    z-index: 40;
+}
+
+.text-container {
+    width: 50%;
+    padding: 32px;
+    text-align: right;
+    z-index: 50;
+}
+
+.main-heading {
+    font-size: 64px;
+    font-weight: 800;
+    color: #1F2937; /* dark slate gray */
+    margin-bottom: 16px;
+}
+
+.sub-heading {
+    color: #6B7280; /* soft gray */
+    margin-bottom: 24px;
+    font-size: 14px;
+}
+
+.more-info-button {
+    padding: 12px 32px;
+    border-radius: 9999px;
+    font-weight: 600;
+    color: white;
+    background-color: #EC4899; /* rose pink */
+    transition-duration: 300ms;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.more-info-button:hover {
+    background-color: #9D174D; /* deeper rose */
+}
+
+a {
+    color: black;
+    text-decoration: none; /* optional: removes underline */
+}
+
+/* Optional: change color on hover */
+a:hover {
+    color: gray; /* or another color for hover effect */
+}
+
